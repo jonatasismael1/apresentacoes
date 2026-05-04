@@ -12,14 +12,12 @@ export const useStorage = () => {
   // Função para salvar na nuvem (Sheets)
   const saveToCloud = async (presentation: Presentation) => {
     try {
-      // Usamos no-cors para evitar problemas de redirecionamento do Google, 
-      // mas isso significa que não podemos ler a resposta.
+      console.log('Sincronizando com a nuvem...', presentation.id);
+      // Usamos no-cors para evitar erros de redirecionamento do Google Apps Script
+      // O Google Apps Script consegue ler o corpo mesmo sem Content-Type: application/json em no-cors
       await fetch(CLOUD_API_URL, {
         method: 'POST',
         mode: 'no-cors',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(presentation),
       });
     } catch (error) {
@@ -46,9 +44,11 @@ export const useStorage = () => {
     try {
       const response = await fetch(CLOUD_API_URL);
       const cloudData = await response.json();
-      if (Array.isArray(cloudData) && cloudData.length > 0) {
-        setPresentations(cloudData);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
+      if (Array.isArray(cloudData)) {
+        if (cloudData.length > 0) {
+          setPresentations(cloudData);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados da nuvem:', error);
@@ -77,6 +77,7 @@ export const useStorage = () => {
   }, [fetchFromCloud]);
 
   const savePresentation = useCallback((presentation: Presentation) => {
+    // 1. Atualiza o estado local primeiro (mais rápido)
     setPresentations(prev => {
       const index = prev.findIndex(p => p.id === presentation.id);
       let updated: Presentation[];
@@ -89,24 +90,22 @@ export const useStorage = () => {
       }
       
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      
-      // Sincroniza com a nuvem em background
-      saveToCloud(presentation);
-      
       return updated;
     });
+
+    // 2. Sincroniza com a nuvem (fora do setter para evitar efeitos colaterais)
+    saveToCloud(presentation);
   }, []);
 
   const deletePresentation = useCallback((id: string) => {
     setPresentations(prev => {
       const updated = prev.filter(p => p.id !== id);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      
-      // Deleta da nuvem em background
-      deleteFromCloud(id);
-      
       return updated;
     });
+
+    // Deleta da nuvem fora do setter
+    deleteFromCloud(id);
   }, []);
 
   const duplicatePresentation = useCallback((id: string) => {
