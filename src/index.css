@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-dbe-darker text-white font-sans antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-dbe-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-medium transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2;
+  }
+  .btn-secondary {
+    @apply bg-dbe-gray hover:bg-zinc-800 text-white px-4 py-2 rounded-lg font-medium transition-all active:scale-95 flex items-center justify-center gap-2;
+  }
+  .btn-ghost {
+    @apply hover:bg-zinc-800/50 text-zinc-400 hover:text-white p-2 rounded-lg transition-all active:scale-95;
+  }
+  .card {
+    @apply bg-dbe-dark border border-zinc-800 rounded-xl overflow-hidden shadow-lg;
+  }
+  .input-field {
+    @apply bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2 focus:ring-2 focus:ring-dbe-blue focus:border-transparent outline-none transition-all w-full text-white placeholder-zinc-500;
+  }
+  .label {
+    @apply block text-sm font-medium text-zinc-400 mb-1;
+  }
+}
+
+@media print {
+  @page {
+    margin: 1.5cm;
+  }
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .page-break {
+    page-break-after: always;
+  }
+  .card {
+    border: 1px solid #eee !important;
+    box-shadow: none !important;
+    background-color: white !important;
+    color: black !important;
+    break-inside: avoid;
+    margin-bottom: 2rem;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-dbe-darker;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-zinc-800 rounded-full hover:bg-zinc-700 transition-colors;
+}
