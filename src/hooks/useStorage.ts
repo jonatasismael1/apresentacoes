@@ -3,9 +3,59 @@ import type { Presentation } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 const STORAGE_KEY = 'dbe_apresentacoes';
+const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbyC05QIQ1oisATuXMydDMKTGYzngOJ8y88FKGeXuvAP0JzXHnWy6NWd8oU6U1HQTXw/exec';
 
 export const useStorage = () => {
   const [presentations, setPresentations] = useState<Presentation[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Função para salvar na nuvem (Sheets)
+  const saveToCloud = async (presentation: Presentation) => {
+    try {
+      // Usamos no-cors para evitar problemas de redirecionamento do Google, 
+      // mas isso significa que não podemos ler a resposta.
+      await fetch(CLOUD_API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(presentation),
+      });
+    } catch (error) {
+      console.error('Erro ao sincronizar com Google Sheets:', error);
+    }
+  };
+
+  // Função para deletar da nuvem
+  const deleteFromCloud = async (id: string) => {
+    try {
+      await fetch(CLOUD_API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: JSON.stringify({ action: 'delete', id }),
+      });
+    } catch (error) {
+      console.error('Erro ao deletar do Google Sheets:', error);
+    }
+  };
+
+  // Função para carregar da nuvem
+  const fetchFromCloud = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(CLOUD_API_URL);
+      const cloudData = await response.json();
+      if (Array.isArray(cloudData) && cloudData.length > 0) {
+        setPresentations(cloudData);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados da nuvem:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -21,7 +71,10 @@ export const useStorage = () => {
       setPresentations(example);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(example));
     }
-  }, []);
+
+    // Tenta carregar da nuvem para manter atualizado
+    fetchFromCloud();
+  }, [fetchFromCloud]);
 
   const savePresentation = useCallback((presentation: Presentation) => {
     setPresentations(prev => {
@@ -36,6 +89,10 @@ export const useStorage = () => {
       }
       
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      
+      // Sincroniza com a nuvem em background
+      saveToCloud(presentation);
+      
       return updated;
     });
   }, []);
@@ -44,6 +101,10 @@ export const useStorage = () => {
     setPresentations(prev => {
       const updated = prev.filter(p => p.id !== id);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      
+      // Deleta da nuvem em background
+      deleteFromCloud(id);
+      
       return updated;
     });
   }, []);
@@ -68,10 +129,12 @@ export const useStorage = () => {
 
   return {
     presentations,
+    isLoading,
     savePresentation,
     deletePresentation,
     duplicatePresentation,
     getPresentation,
+    refresh: fetchFromCloud
   };
 };
 
@@ -98,18 +161,6 @@ const getExampleData = (): Presentation[] => {
           cta: 'Clique no link da bio para testar grátis.',
           notes: 'Gravar em ambiente de escritório moderno.',
           referenceLink: 'https://youtube.com/exemplo1'
-        },
-        {
-          id: uuidv4(),
-          title: 'Vídeo 2: Prova Social',
-          theme: 'Resultados reais',
-          audience: 'Diretores Financeiros',
-          tone: 'Direto e Assertivo',
-          hook: 'Como reduzimos os custos operacionais em 30% para nossos parceiros.',
-          development: 'Apresentação de dados e depoimentos rápidos.',
-          cta: 'Fale com um consultor agora.',
-          notes: 'Usar gráficos na edição.',
-          referenceLink: ''
         }
       ],
       createdAt: new Date().toISOString(),
