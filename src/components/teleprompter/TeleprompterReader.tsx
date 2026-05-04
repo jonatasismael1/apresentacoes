@@ -115,6 +115,28 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
     setIsPlaying(false);
   };
 
+  // Touch Support for Manual Scrolling
+  const touchStartY = useRef<number | null>(null);
+  const initialScrollPos = useRef<number>(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    initialScrollPos.current = scrollPos;
+    setIsPlaying(false); // Pausa ao tocar para permitir ajuste manual
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY.current === null) return;
+    const touchY = e.touches[0].clientY;
+    const deltaY = touchStartY.current - touchY;
+    // Sensibilidade do scroll: 1.5x para ser mais responsivo ao toque
+    setScrollPos(Math.max(0, initialScrollPos.current + deltaY * 1.5));
+  };
+
+  const handleTouchEnd = () => {
+    touchStartY.current = null;
+  };
+
   return (
     <div 
       className="fixed inset-0 z-50 flex flex-col select-none overflow-hidden"
@@ -156,8 +178,16 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
       {/* Área do Texto */}
       <div 
         ref={containerRef}
-        className="flex-1 flex flex-col items-center overflow-hidden cursor-pointer"
-        onClick={() => setIsPlaying(!isPlaying)}
+        className="flex-1 flex flex-col items-center overflow-hidden cursor-pointer touch-none"
+        onClick={() => {
+          // Só alterna o play se não estiver arrastando
+          if (touchStartY.current === null) {
+            setIsPlaying(!isPlaying);
+          }
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         <div 
           ref={scrollRef}
