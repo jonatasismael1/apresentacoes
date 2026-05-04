@@ -12,16 +12,24 @@ export const useStorage = () => {
   // Função para salvar na nuvem (Sheets)
   const saveToCloud = async (presentation: Presentation) => {
     try {
-      console.log('Sincronizando com a nuvem...', presentation.id);
-      // Usamos no-cors para evitar erros de redirecionamento do Google Apps Script
-      // O Google Apps Script consegue ler o corpo mesmo sem Content-Type: application/json em no-cors
+      console.log('--- TESTE DE SINCRONIZAÇÃO ---');
+      console.log('Enviando ID:', presentation.id);
+      console.log('Para URL:', CLOUD_API_URL);
+      
+      const payload = JSON.stringify(presentation);
+      
       await fetch(CLOUD_API_URL, {
         method: 'POST',
         mode: 'no-cors',
-        body: JSON.stringify(presentation),
+        headers: {
+          'Content-Type': 'text/plain', // Usar text/plain em no-cors é o segredo para evitar preflight
+        },
+        body: payload,
       });
+      
+      console.log('Requisição enviada (via no-cors). Verifique sua planilha e as "Execuções" no Apps Script.');
     } catch (error) {
-      console.error('Erro ao sincronizar com Google Sheets:', error);
+      console.error('ERRO CRÍTICO NA SINCRONIZAÇÃO:', error);
     }
   };
 
