@@ -71,7 +71,7 @@ const Editor: React.FC = () => {
       return;
     }
     savePresentation(formData);
-    showToast('Apresentação salva com sucesso', 'success');
+    showToast('Salvo localmente. Sincronização enviada!', 'success');
     if (!id) navigate(`/editar/${formData.id}`);
   };
 

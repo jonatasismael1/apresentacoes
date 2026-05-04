@@ -12,37 +12,39 @@ export const useStorage = () => {
   // Função para salvar na nuvem (Sheets)
   const saveToCloud = async (presentation: Presentation) => {
     try {
-      console.log('--- TESTE DE SINCRONIZAÇÃO ---');
-      console.log('Enviando ID:', presentation.id);
-      console.log('Para URL:', CLOUD_API_URL);
+      console.log(`[Cloud Sync] Iniciando sincronização da apresentação: ${presentation.title} (${presentation.id})`);
       
       const payload = JSON.stringify(presentation);
       
+      // Enviamos como POST em modo no-cors. 
+      // Importante: no-cors não permite ler a resposta, então não sabemos se deu erro no servidor,
+      // apenas se a requisição foi despachada com sucesso.
       await fetch(CLOUD_API_URL, {
         method: 'POST',
         mode: 'no-cors',
         headers: {
-          'Content-Type': 'text/plain', // Usar text/plain em no-cors é o segredo para evitar preflight
+          'Content-Type': 'text/plain',
         },
         body: payload,
       });
       
-      console.log('Requisição enviada (via no-cors). Verifique sua planilha e as "Execuções" no Apps Script.');
+      console.log(`[Cloud Sync] Requisição enviada para: ${CLOUD_API_URL}`);
     } catch (error) {
-      console.error('ERRO CRÍTICO NA SINCRONIZAÇÃO:', error);
+      console.error('[Cloud Sync] ERRO ao tentar enviar para a nuvem:', error);
     }
   };
 
   // Função para deletar da nuvem
   const deleteFromCloud = async (id: string) => {
     try {
+      console.log(`[Cloud Sync] Solicitando exclusão na nuvem: ${id}`);
       await fetch(CLOUD_API_URL, {
         method: 'POST',
         mode: 'no-cors',
         body: JSON.stringify({ action: 'delete', id }),
       });
     } catch (error) {
-      console.error('Erro ao deletar do Google Sheets:', error);
+      console.error('[Cloud Sync] ERRO ao tentar deletar na nuvem:', error);
     }
   };
 
@@ -50,16 +52,21 @@ export const useStorage = () => {
   const fetchFromCloud = useCallback(async () => {
     setIsLoading(true);
     try {
+      console.log('[Cloud Sync] Buscando dados atualizados da nuvem...');
       const response = await fetch(CLOUD_API_URL);
       const cloudData = await response.json();
+      
       if (Array.isArray(cloudData)) {
+        console.log(`[Cloud Sync] ${cloudData.length} apresentações carregadas da nuvem.`);
         if (cloudData.length > 0) {
           setPresentations(cloudData);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
         }
+      } else if (cloudData.status === 'error') {
+        console.error('[Cloud Sync] Erro retornado pelo script:', cloudData.message);
       }
     } catch (error) {
-      console.error('Erro ao carregar dados da nuvem:', error);
+      console.error('[Cloud Sync] Falha ao carregar dados da nuvem (pode ser erro de CORS ou script offline):', error);
     } finally {
       setIsLoading(false);
     }
@@ -85,7 +92,7 @@ export const useStorage = () => {
   }, [fetchFromCloud]);
 
   const savePresentation = useCallback((presentation: Presentation) => {
-    // 1. Atualiza o estado local primeiro (mais rápido)
+    // 1. Salva localmente primeiro (garante funcionamento offline e velocidade)
     setPresentations(prev => {
       const index = prev.findIndex(p => p.id === presentation.id);
       let updated: Presentation[];
@@ -101,7 +108,7 @@ export const useStorage = () => {
       return updated;
     });
 
-    // 2. Sincroniza com a nuvem (fora do setter para evitar efeitos colaterais)
+    // 2. Tenta sincronizar com a nuvem
     saveToCloud(presentation);
   }, []);
 
@@ -112,7 +119,7 @@ export const useStorage = () => {
       return updated;
     });
 
-    // Deleta da nuvem fora do setter
+    // Tenta remover da nuvem
     deleteFromCloud(id);
   }, []);
 
