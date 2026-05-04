@@ -215,68 +215,68 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
-            className="absolute bottom-4 sm:bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 z-20 w-full px-4"
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-20 w-auto max-w-[95vw]"
           >
-            <div className="flex items-center gap-2 sm:gap-3 bg-zinc-900/90 backdrop-blur-md p-2 rounded-2xl border border-zinc-800 shadow-2xl overflow-x-auto max-w-full no-scrollbar">
+            <div className="flex items-center gap-1.5 sm:gap-3 bg-zinc-900/95 backdrop-blur-xl p-1.5 sm:p-2 rounded-full sm:rounded-2xl border border-zinc-800 shadow-2xl">
               <button 
                 onClick={handleReset}
-                className="btn-ghost p-3 shrink-0"
+                className="p-2 sm:p-3 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
                 title="Reiniciar (R)"
               >
-                <RotateCcw size={20} />
+                <RotateCcw size={18} />
               </button>
 
-              <div className="w-[1px] h-8 bg-zinc-800 mx-1 shrink-0" />
+              <div className="w-[1px] h-6 sm:h-8 bg-zinc-800 mx-0.5" />
 
               <button 
                 onClick={() => updateSettings({ speed: Math.max(0.1, settings.speed - 0.2) })}
-                className="btn-ghost p-3 shrink-0"
+                className="p-2 sm:p-3 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
               >
-                <Minus size={20} />
+                <Minus size={18} />
               </button>
 
               <button 
                 onClick={() => setIsPlaying(!isPlaying)}
-                className="w-14 h-14 bg-dbe-blue hover:bg-blue-600 rounded-full flex items-center justify-center text-white transition-all active:scale-90 shrink-0 shadow-lg shadow-dbe-blue/40"
+                className="w-12 h-12 sm:w-14 sm:h-14 bg-dbe-blue hover:bg-blue-600 rounded-full flex items-center justify-center text-white transition-all active:scale-90 shadow-lg shadow-dbe-blue/40"
               >
-                {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
+                {isPlaying ? <Pause size={24} sm:size={28} fill="currentColor" /> : <Play size={24} sm:size={28} fill="currentColor" className="ml-1" />}
               </button>
 
               <button 
                 onClick={() => updateSettings({ speed: Math.min(10, settings.speed + 0.2) })}
-                className="btn-ghost p-3 shrink-0"
+                className="p-2 sm:p-3 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
               >
-                <Plus size={20} />
+                <Plus size={18} />
               </button>
 
-              <div className="w-[1px] h-8 bg-zinc-800 mx-1 shrink-0" />
+              <div className="w-[1px] h-6 sm:h-8 bg-zinc-800 mx-0.5" />
 
               <button 
                 onClick={() => updateSettings({ isMirrored: !settings.isMirrored })}
-                className={`btn-ghost p-3 shrink-0 ${settings.isMirrored ? 'text-dbe-blue bg-dbe-blue/10 border-dbe-blue/20' : ''}`}
+                className={`p-2 sm:p-3 rounded-full transition-colors ${settings.isMirrored ? 'text-dbe-blue bg-dbe-blue/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
                 title="Espelhar (M)"
               >
-                <FlipHorizontal size={20} />
+                <FlipHorizontal size={18} />
               </button>
 
               <button 
                 onClick={toggleFullscreen}
-                className="btn-ghost p-3 shrink-0"
+                className="p-2 sm:p-3 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
                 title="Tela Cheia (F)"
               >
-                {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
+                {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
               </button>
 
               <button 
                 onClick={onExit}
-                className="btn-ghost p-3 hover:text-red-500 shrink-0"
+                className="p-2 sm:p-3 hover:bg-red-500/20 hover:text-red-500 rounded-full transition-colors text-zinc-400"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="px-4 py-1.5 bg-black/60 rounded-full text-[10px] font-bold uppercase tracking-widest text-zinc-400 border border-zinc-800 backdrop-blur-sm">
-              Velocidade: {settings.speed.toFixed(1)}x | Fonte: {settings.fontSize}px
+            <div className="px-3 py-1 bg-black/60 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-zinc-400 border border-zinc-800 backdrop-blur-sm">
+              {settings.speed.toFixed(1)}x | {settings.fontSize}px
             </div>
           </motion.div>
         )}
