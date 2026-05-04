@@ -239,7 +239,7 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
                 onClick={() => setIsPlaying(!isPlaying)}
                 className="w-12 h-12 sm:w-14 sm:h-14 bg-dbe-blue hover:bg-blue-600 rounded-full flex items-center justify-center text-white transition-all active:scale-90 shadow-lg shadow-dbe-blue/40"
               >
-                {isPlaying ? <Pause size={24} sm:size={28} fill="currentColor" /> : <Play size={24} sm:size={28} fill="currentColor" className="ml-1" />}
+                {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
               </button>
 
               <button 
