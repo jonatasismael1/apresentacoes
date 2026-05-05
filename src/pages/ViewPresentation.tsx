@@ -164,7 +164,11 @@ const ViewPresentation: React.FC = () => {
 const generateStandaloneHTML = (data: Presentation) => {
   const primaryColor = data.primaryColor || '#0090D0';
   const secondaryColor = data.secondaryColor || '#22C55E';
-  const clientLogo = data.clientLogo ? `data:image/png;base64,${data.clientLogo.split(',').pop()}` : '';
+  const clientLogo = data.clientLogo
+    ? data.clientLogo.startsWith('data:')
+      ? data.clientLogo
+      : `data:image/png;base64,${data.clientLogo}`
+    : '';
   
   return `
 <!DOCTYPE html>
@@ -344,6 +348,54 @@ const generateStandaloneHTML = (data: Presentation) => {
           text-transform: uppercase;
           margin-bottom: 1.5rem;
         }
+        .cover {
+          min-height: 100vh;
+          padding: 5rem 2rem;
+        }
+        .content-section {
+          padding: 4rem 0;
+        }
+        .title-main {
+          font-size: clamp(2.5rem, 8vw, 4.5rem);
+        }
+        .glass {
+          padding: 2rem;
+        }
+        .grid-container {
+          grid-template-columns: 1fr;
+        }
+
+        @media (max-width: 768px) {
+          .cover {
+            padding: 3rem 1.25rem;
+          }
+          .logo-frame {
+            width: 96px;
+            height: 96px;
+          }
+          .tagline {
+            font-size: 0.65rem;
+            margin-bottom: 1rem;
+          }
+          .title-main {
+            font-size: clamp(2rem, 12vw, 3.25rem);
+          }
+          .glass {
+            padding: 1.5rem;
+          }
+          .grid-container {
+            gap: 1.5rem;
+          }
+          .script-header {
+            flex-wrap: wrap;
+            gap: 1rem;
+          }
+          .index-box {
+            width: 2.75rem;
+            height: 2.75rem;
+            font-size: 1.15rem;
+          }
+        }
 
         @media print {
           body { background: #fff; color: #000; }
@@ -358,9 +410,7 @@ const generateStandaloneHTML = (data: Presentation) => {
 </head>
 <body class="bg-mesh">
     <!-- Capa Premium -->
-    <div class="min-h-screen flex flex-col items-center justify-center p-8 relative overflow-hidden">
-        <div class="relative z-10 w-full max-w-4xl mx-auto text-center">
-            <div class="mb-12 flex flex-col items-center justify-center">
+    <div class="cover flex flex-col items-center justify-center relative overflow-hidden">
               <div class="logo-frame">
                 ${clientLogo ? `<img src="${clientLogo}" alt="Logo do cliente" />` : `<div style="font-weight:900;color:${primaryColor};font-size:1.25rem;">DBE</div>`}
               </div>
