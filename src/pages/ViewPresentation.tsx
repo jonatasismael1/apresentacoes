@@ -239,7 +239,7 @@ const generateStandaloneHTML = (data: Presentation) => {
 
         /* TYPOGRAPHY */
         .title-main {
-          font-size: clamp(3rem, 10vw, 5rem);
+          font-size: clamp(2rem, 6vw, 3.5rem);
           font-weight: 900;
           text-transform: uppercase;
           font-style: italic;
@@ -249,15 +249,15 @@ const generateStandaloneHTML = (data: Presentation) => {
         }
 
         .script-card {
-          margin-bottom: 10rem;
+          margin-bottom: 6rem;
           position: relative;
         }
 
         .script-number {
           position: absolute;
-          left: -2rem;
-          top: -2rem;
-          font-size: 12rem;
+          left: -1rem;
+          top: -1.5rem;
+          font-size: 6rem;
           font-weight: 900;
           font-style: italic;
           opacity: 0.05;
@@ -269,14 +269,14 @@ const generateStandaloneHTML = (data: Presentation) => {
           display: flex;
           align-items: center;
           gap: 1.5rem;
-          margin-bottom: 3rem;
+          margin-bottom: 2rem;
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          padding-bottom: 2rem;
+          padding-bottom: 1.5rem;
         }
 
         .index-box {
-          width: 3.5rem;
-          height: 3.5rem;
+          width: 3rem;
+          height: 3rem;
           background: ${primaryColor};
           color: #000;
           display: flex;
@@ -284,12 +284,12 @@ const generateStandaloneHTML = (data: Presentation) => {
           justify-content: center;
           font-weight: 900;
           font-style: italic;
-          font-size: 1.5rem;
+          font-size: 1.25rem;
           border-radius: 1rem;
         }
 
         .script-title {
-          font-size: 2.5rem;
+          font-size: 1.75rem;
           font-weight: 900;
           text-transform: uppercase;
           font-style: italic;
@@ -298,15 +298,15 @@ const generateStandaloneHTML = (data: Presentation) => {
         .grid-container {
           display: grid;
           grid-template-columns: 1fr;
-          gap: 2rem;
+          gap: 1.5rem;
         }
         @media (min-width: 1024px) {
           .grid-container { grid-template-columns: 7fr 5fr; }
         }
 
         .content-block {
-          padding: 2rem;
-          margin-bottom: 2rem;
+          padding: 1.5rem;
+          margin-bottom: 1.5rem;
         }
 
         .hook-box {
@@ -314,16 +314,16 @@ const generateStandaloneHTML = (data: Presentation) => {
           background: rgba(57, 255, 20, 0.03);
         }
         .hook-label { color: #39FF14; font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 1rem; display: block;}
-        .hook-text { font-size: 1.5rem; font-weight: 700; }
+        .hook-text { font-size: 1.2rem; font-weight: 700; }
 
         .cta-box {
           background: ${primaryColor};
           color: #000;
-          padding: 2.5rem;
-          border-radius: 2rem;
+          padding: 2rem;
+          border-radius: 1.5rem;
         }
         .cta-label { opacity: 0.5; font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 1rem; display: block;}
-        .cta-text { font-size: 2rem; font-weight: 900; text-transform: uppercase; font-style: italic; line-height: 1; }
+        .cta-text { font-size: 1.5rem; font-weight: 900; text-transform: uppercase; font-style: italic; line-height: 1; }
         .logo-frame {
           width: 120px;
           height: 120px;
@@ -351,19 +351,10 @@ const generateStandaloneHTML = (data: Presentation) => {
         }
         .cover {
           min-height: 100vh;
-          padding: 5rem 2rem;
+          padding: 4rem 2rem;
         }
         .content-section {
           padding: 4rem 0;
-        }
-        .title-main {
-          font-size: clamp(2.5rem, 8vw, 4.5rem);
-        }
-        .glass {
-          padding: 2rem;
-        }
-        .grid-container {
-          grid-template-columns: 1fr;
         }
 
         @media (max-width: 768px) {
@@ -379,7 +370,7 @@ const generateStandaloneHTML = (data: Presentation) => {
             margin-bottom: 1rem;
           }
           .title-main {
-            font-size: clamp(2rem, 12vw, 3.25rem);
+            font-size: clamp(1.75rem, 8vw, 2.5rem);
           }
           .glass {
             padding: 1.5rem;
@@ -399,13 +390,12 @@ const generateStandaloneHTML = (data: Presentation) => {
         }
 
         @media print {
-          body { background: #fff; color: #000; }
-          .bg-mesh { background: #fff; }
-          .glass { border: 1px solid #ddd; background: #fff; color: #000; box-shadow: none; backdrop-filter: none; }
-          .title-main { color: #000; }
-          .cta-box { border: 2px solid #000; background: #fff; }
+          body, .bg-mesh { background-color: #000000 !important; color: #ffffff !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          .glass { border: 1px solid rgba(255,255,255,0.1) !important; background: rgba(255,255,255,0.03) !important; color: #ffffff !important; box-shadow: none !important; backdrop-filter: none !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          .title-main { color: #ffffff !important; }
+          .cta-box { background: ${primaryColor} !important; color: #000 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .page-break { page-break-after: always; }
-          .no-print { display: none; }
+          .no-print { display: none !important; }
         }
     </style>
 </head>

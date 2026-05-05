@@ -6,10 +6,11 @@ import type { Presentation, Script } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   ArrowLeft, Save, Plus, Trash2, 
-  Copy, Layout, Eye, Settings, GripVertical
+  Copy, Layout, Eye, Settings, GripVertical, FileText
 } from 'lucide-react';
 import LogoUpload from '../components/LogoUpload';
 import PresentationPreview from '../components/PresentationPreview';
+import BulkImportModal from '../components/BulkImportModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
@@ -37,6 +38,7 @@ const Editor: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'dados' | 'roteiros'>('dados');
   const [showPreview, setShowPreview] = useState(true);
+  const [showBulkImport, setShowBulkImport] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -147,6 +149,14 @@ const Editor: React.FC = () => {
     const duplicated: Script = { ...script, id: uuidv4(), title: `${script.title} (Cópia)` };
     setFormData(prev => ({ ...prev, scripts: [...prev.scripts, duplicated] }));
     showToast('Roteiro duplicado', 'info');
+  };
+
+  const handleBulkImport = (newScripts: Script[]) => {
+    setFormData(prev => ({
+      ...prev,
+      scripts: [...prev.scripts, ...newScripts]
+    }));
+    showToast(`${newScripts.length} roteiros importados com sucesso!`, 'success');
   };
 
   return (
@@ -412,10 +422,22 @@ const Editor: React.FC = () => {
                 </DragDropContext>
                 
                 {formData.scripts.length > 0 && (
-                  <button onClick={addScript} className="btn-secondary w-full py-3">
-                    <Plus size={18} />
-                    Adicionar Outro Roteiro
-                  </button>
+                  <div className="flex gap-2">
+                    <button onClick={addScript} className="btn-secondary flex-1 py-3">
+                      <Plus size={18} />
+                      Adicionar Outro Roteiro
+                    </button>
+                    <button onClick={() => setShowBulkImport(true)} className="btn-secondary py-3 px-4" title="Importação em Massa">
+                      <FileText size={18} />
+                    </button>
+                  </div>
+                )}
+                {formData.scripts.length === 0 && (
+                  <div className="flex justify-end">
+                     <button onClick={() => setShowBulkImport(true)} className="btn-ghost flex items-center gap-2 text-dbe-blue text-xs uppercase tracking-wider">
+                      <FileText size={14} /> Importar em massa
+                    </button>
+                  </div>
                 )}
               </div>
             )}
@@ -439,6 +461,12 @@ const Editor: React.FC = () => {
           </button>
         </div>
       </main>
+
+      <BulkImportModal 
+        isOpen={showBulkImport} 
+        onClose={() => setShowBulkImport(false)} 
+        onImport={handleBulkImport} 
+      />
     </div>
   );
 };

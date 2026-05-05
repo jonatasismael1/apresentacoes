@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStorage } from '../hooks/useStorage';
 import { useToast } from '../components/Toast';
-import { Plus, Edit2, Copy, Trash2, Eye, Search, FileText, Monitor } from 'lucide-react';
+import { Plus, Edit2, Copy, Trash2, Eye, Search, FileText, Monitor, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import DBELogo from '../components/DBELogo';
 
@@ -46,7 +46,11 @@ const Dashboard: React.FC = () => {
             )}
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <button onClick={() => navigate('/teleprompter-rapido')} className="btn-secondary hidden sm:flex border border-dbe-blue/30 text-dbe-blue hover:bg-dbe-blue/10">
+            <Zap size={18} fill="currentColor" />
+            Teleprompter Rápido
+          </button>
           <button onClick={() => navigate('/teleprompter')} className="btn-secondary hidden sm:flex">
             <Monitor size={18} />
             Teleprompter

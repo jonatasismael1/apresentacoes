@@ -33,28 +33,32 @@
 
 @media print {
   @page {
-    margin: 1.5cm;
+    margin: 0;
   }
-  body {
-    background-color: white !important;
-    color: black !important;
+  
+  body, .bg-mesh, .bg-dbe-darker, .bg-dbe-dark, #root {
+    background-color: #000000 !important;
+    background-image: none !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
+
   .no-print {
     display: none !important;
   }
-  .print-only {
-    display: block !important;
+
+  .card, .glass {
+    background-color: #18181b !important; /* bg-zinc-900 equivalent */
+    border: 1px solid #27272a !important; /* border-zinc-800 equivalent */
+    color: #ffffff !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
+
   .page-break {
     page-break-after: always;
-  }
-  .card {
-    border: 1px solid #eee !important;
-    box-shadow: none !important;
-    background-color: white !important;
-    color: black !important;
-    break-inside: avoid;
-    margin-bottom: 2rem;
   }
 }
 

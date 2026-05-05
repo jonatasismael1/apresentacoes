@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   X, Play, Pause, RotateCcw, Plus, Minus, 
-  Maximize2, Minimize2, FlipHorizontal, Eye, EyeOff 
+  Maximize2, Minimize2, FlipHorizontal, Eye, EyeOff, Smartphone
 } from 'lucide-react';
 import type { TeleprompterSettings } from '../../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,6 +18,7 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
   const [scrollPos, setScrollPos] = useState(0);
   const [showControls, setShowControls] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isRotatedCSS, setIsRotatedCSS] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -137,10 +138,25 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
     touchStartY.current = null;
   };
 
+  const handleToggleRotation = () => {
+    setIsRotatedCSS(!isRotatedCSS);
+    if (!isRotatedCSS) setIsPortrait(false); // Hide portrait warning if user forces rotation
+  };
+
   return (
     <div 
-      className="fixed inset-0 z-50 flex flex-col select-none overflow-hidden"
-      style={{ backgroundColor: settings.bgColor, color: settings.textColor }}
+      className={`fixed z-50 flex flex-col select-none overflow-hidden ${!isRotatedCSS ? 'inset-0' : ''}`}
+      style={{ 
+        backgroundColor: settings.bgColor, 
+        color: settings.textColor,
+        ...(isRotatedCSS ? {
+          width: '100vh',
+          height: '100vw',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%) rotate(90deg)'
+        } : {})
+      }}
     >
       {/* Aviso de Orientação */}
       <AnimatePresence>
@@ -265,6 +281,14 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
                 title="Tela Cheia (F)"
               >
                 {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+              </button>
+
+              <button 
+                onClick={handleToggleRotation}
+                className={`p-2 sm:p-3 rounded-full transition-colors ${isRotatedCSS ? 'text-dbe-blue bg-dbe-blue/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
+                title="Girar Tela (Fallback)"
+              >
+                <Smartphone size={18} className={isRotatedCSS ? 'rotate-90' : ''} />
               </button>
 
               <button 
