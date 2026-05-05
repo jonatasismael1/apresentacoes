@@ -3,7 +3,44 @@ import type { Presentation } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 const STORAGE_KEY = 'dbe_apresentacoes';
-const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbzkC1VpVms9WF940ZroVzmrz9KjKvq7aQRs7oQylkkfqw1_tXQFhaI8mIoMpI1_11A7/exec';
+const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbzTt15VdiCcqn9kYwQkl4oc2jQ5UL8uYJZ1k2ToMNRby4F-TJ7C7zLYKVc4HA2hI2YG/exec';
+
+const fetchJsonp = <T,>(url: string): Promise<T> => {
+  return new Promise((resolve, reject) => {
+    const callbackName = `jsonp_callback_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+
+    const script = document.createElement('script');
+    script.src = `${url}?callback=${callbackName}`;
+    script.async = true;
+
+    const cleanup = () => {
+      delete (window as any)[callbackName];
+
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timeout ao carregar dados da nuvem via JSONP'));
+    }, 10000);
+
+    (window as any)[callbackName] = (data: T) => {
+      clearTimeout(timeout);
+      cleanup();
+      resolve(data);
+    };
+
+    script.onerror = () => {
+      clearTimeout(timeout);
+      cleanup();
+      reject(new Error('Erro ao carregar JSONP'));
+    };
+
+    document.body.appendChild(script);
+  });
+};
 
 export const useStorage = () => {
   const [presentations, setPresentations] = useState<Presentation[]>([]);
@@ -45,25 +82,32 @@ export const useStorage = () => {
     }
   };
 
-  // Função para carregar da nuvem
+  // Função para carregar da nuvem via JSONP (Bypasses CORS)
   const fetchFromCloud = useCallback(async () => {
     setIsLoading(true);
+
     try {
-      console.log('[Cloud Sync] Buscando dados atualizados da nuvem...');
-      const response = await fetch(CLOUD_API_URL);
-      const cloudData = await response.json();
-      
+      console.log('[Cloud Sync] Buscando dados da nuvem via JSONP...');
+
+      const cloudData = await fetchJsonp<Presentation[] | { status: string; message?: string }>(CLOUD_API_URL);
+
       if (Array.isArray(cloudData)) {
         console.log(`[Cloud Sync] ${cloudData.length} apresentações carregadas da nuvem.`);
-        if (cloudData.length > 0) {
-          setPresentations(cloudData);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
-        }
-      } else if (cloudData.status === 'error') {
-        console.error('[Cloud Sync] Erro retornado pelo script:', cloudData.message);
+
+        setPresentations(cloudData);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
+        return;
       }
+
+      if (cloudData && (cloudData as any).status === 'error') {
+        console.error('[Cloud Sync] Erro retornado pelo Apps Script:', (cloudData as any).message);
+        return;
+      }
+
+      console.error('[Cloud Sync] Resposta inesperada da nuvem:', cloudData);
+
     } catch (error) {
-      console.error('[Cloud Sync] Falha ao carregar dados da nuvem (pode ser erro de CORS ou script offline):', error);
+      console.error('[Cloud Sync] Erro ao carregar dados via JSONP:', error);
     } finally {
       setIsLoading(false);
     }
@@ -84,9 +128,9 @@ export const useStorage = () => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(example));
     }
 
-    // Tenta carregar da nuvem para manter atualizado
-    // fetchFromCloud(); // Comentado temporariamente para depuração do POST
-  }, []);
+    // Tenta carregar da nuvem para manter atualizado entre dispositivos
+    fetchFromCloud();
+  }, [fetchFromCloud]);
 
   const savePresentation = useCallback((presentation: Presentation) => {
     // 1. Salva localmente primeiro (garante funcionamento offline e velocidade)
