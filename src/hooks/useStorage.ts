@@ -9,43 +9,54 @@ export const useStorage = () => {
   const [presentations, setPresentations] = useState<Presentation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Função para salvar na nuvem (Sheets)
-  const saveToCloud = async (presentation: Presentation) => {
-    try {
-      console.log(`[Cloud Sync] Iniciando sincronização da apresentação: ${presentation.title} (${presentation.id})`);
-      
-      const payload = JSON.stringify(presentation);
-      
-      // Enviamos como POST em modo no-cors. 
-      // Importante: no-cors não permite ler a resposta, então não sabemos se deu erro no servidor,
-      // apenas se a requisição foi despachada com sucesso.
-      await fetch(CLOUD_API_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'text/plain',
-        },
-        body: payload,
-      });
-      
-      console.log(`[Cloud Sync] Requisição enviada para: ${CLOUD_API_URL}`);
-    } catch (error) {
-      console.error('[Cloud Sync] ERRO ao tentar enviar para a nuvem:', error);
+  // Função utilitária para envio via Form POST invisível (Ignora CORS)
+  const submitToGoogleScript = (payload: any) => {
+    console.log('[Cloud Sync] Preparando envio para Google Sheets:', payload);
+
+    let iframe = document.querySelector<HTMLIFrameElement>('iframe[name="hidden_google_sheets_iframe"]');
+
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.name = 'hidden_google_sheets_iframe';
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
     }
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = CLOUD_API_URL;
+    form.target = 'hidden_google_sheets_iframe';
+    form.style.display = 'none';
+
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = JSON.stringify(payload);
+
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    form.submit();
+
+    setTimeout(() => {
+      if (form.parentNode) {
+        form.parentNode.removeChild(form);
+      }
+    }, 1000);
+
+    console.log('[Cloud Sync] Form POST enviado.');
+  };
+
+  // Função para salvar na nuvem (Sheets)
+  const saveToCloud = (presentation: Presentation) => {
+    console.log('[Cloud Sync] Enviando apresentação para Google Sheets');
+    submitToGoogleScript(presentation);
   };
 
   // Função para deletar da nuvem
-  const deleteFromCloud = async (id: string) => {
-    try {
-      console.log(`[Cloud Sync] Solicitando exclusão na nuvem: ${id}`);
-      await fetch(CLOUD_API_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        body: JSON.stringify({ action: 'delete', id }),
-      });
-    } catch (error) {
-      console.error('[Cloud Sync] ERRO ao tentar deletar na nuvem:', error);
-    }
+  const deleteFromCloud = (id: string) => {
+    console.log('[Cloud Sync] Enviando exclusão para Google Sheets');
+    submitToGoogleScript({ action: 'delete', id });
   };
 
   // Função para carregar da nuvem
