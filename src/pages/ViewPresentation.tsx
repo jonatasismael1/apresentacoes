@@ -162,114 +162,205 @@ const ViewPresentation: React.FC = () => {
 
 // Function to generate a standalone HTML file
 const generateStandaloneHTML = (data: Presentation) => {
-  // We'll use a simplified version of the Tailwind styles to ensure it looks good offline
+  const primaryColor = data.primaryColor || '#0090D0';
+  
   return `
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DBE - Apresentação para ${data.clientName}</title>
+    <title>DBE - ${data.clientName}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'dbe-blue': '#0090D0',
+              'dbe-green': '#39FF14',
+            },
+            fontFamily: {
+              'display': ['Outfit', 'sans-serif'],
+              'sans': ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #09090b; color: white; }
-        .bg-gradient { background: radial-gradient(circle at center, ${data.primaryColor || '#0047FF'}15 0%, transparent 70%); }
+        body { 
+          font-family: 'Inter', sans-serif; 
+          background-color: #000000; 
+          color: white; 
+          -webkit-print-color-adjust: exact;
+        }
+        .bg-mesh {
+          background-color: #000000;
+          background-image: 
+            radial-gradient(at 0% 0%, ${primaryColor}15 0px, transparent 50%),
+            radial-gradient(at 100% 0%, ${primaryColor}10 0px, transparent 50%);
+        }
+        .glass {
+          background: rgba(255, 255, 255, 0.03);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
         @media print {
             body { background: white !important; color: black !important; }
             .no-print { display: none !important; }
+            .glass { background: white !important; border: 1px solid #eee !important; color: black !important; }
+            .bg-mesh { background: white !important; }
             .page-break { page-break-after: always; }
         }
     </style>
 </head>
-<body>
-    <div class="bg-gradient min-h-screen">
-        <!-- Capa -->
-        <div class="h-screen flex flex-col items-center justify-center text-center p-8">
-            <div style="height: 100px; margin-bottom: 48px;">
-              <img src="logo-dbe.png" alt="DBE" style="height: 100%; width: auto; object-fit: contain;" onerror="this.style.display='none'">
-              <!-- Fallback caso a imagem não esteja na mesma pasta -->
-              <h2 id="fallback-logo" class="text-2xl font-bold tracking-tighter" style="display:none;"><span style="color: #0090D0">DBE</span> — DOS BASTIDORES AO ESPETÁCULO</h2>
-              <script>
-                document.querySelector('img').onerror = function() {
-                  this.style.display='none';
-                  document.getElementById('fallback-logo').style.display='block';
-                };
-              </script>
+<body class="bg-mesh min-h-screen">
+    <!-- Capa Premium -->
+    <div class="min-h-screen flex flex-col items-center justify-center p-8 relative overflow-hidden">
+        <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 pointer-events-none"></div>
+        
+        <div class="relative z-10 w-full max-w-4xl mx-auto text-center">
+            <div class="mb-12 inline-block">
+                <div class="flex items-center gap-4">
+                  <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-black font-black italic text-2xl" style="background-color: ${primaryColor}">
+                    DBE
+                  </div>
+                  <div class="text-left">
+                    <div class="text-xs font-black tracking-[0.3em] uppercase text-zinc-500">Dos Bastidores</div>
+                    <div class="text-xs font-black tracking-[0.3em] uppercase text-zinc-500">Ao Espetáculo</div>
+                  </div>
+                </div>
             </div>
-            <h1 class="text-5xl md:text-7xl font-bold mb-6 tracking-tight leading-tight">${data.title}</h1>
-            <div class="flex flex-wrap items-center justify-center gap-4 mb-12">
-                <span class="px-4 py-1.5 rounded-full border border-zinc-800 text-sm font-medium uppercase tracking-wider">${data.clientName}</span>
-                <span class="px-4 py-1.5 rounded-full bg-zinc-900 text-sm font-medium uppercase tracking-wider">${data.clientSegment}</span>
+
+            <h1 class="text-6xl md:text-8xl font-display font-black mb-8 tracking-tighter leading-none italic uppercase">
+                ${data.title}
+            </h1>
+
+            <div class="flex flex-wrap items-center justify-center gap-4 mb-16">
+                <div class="px-6 py-2 rounded-full glass text-sm font-bold uppercase tracking-widest text-dbe-blue">
+                    ${data.clientName}
+                </div>
+                <div class="px-6 py-2 rounded-full border border-zinc-800 text-sm font-bold uppercase tracking-widest text-zinc-400">
+                    ${data.clientSegment}
+                </div>
             </div>
-            <div class="max-w-2xl mx-auto p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
-                <div class="text-sm font-bold uppercase tracking-widest mb-3" style="color: ${data.primaryColor || '#0047FF'}">Objetivo da Campanha</div>
-                <p class="text-xl text-zinc-300">${data.objective}</p>
-            </div>
-            <div class="absolute bottom-8 w-full flex justify-center gap-8 text-xs text-zinc-500 font-medium">
-                <span>${data.responsible}</span>
-                <span>${data.date}</span>
-                <span>${data.format}</span>
+
+            <div class="glass p-10 rounded-[2rem] max-w-2xl mx-auto relative group transition-all duration-500 hover:border-dbe-blue/30">
+                <div class="absolute -top-4 left-1/2 -translate-x-1/2 px-6 py-1 bg-dbe-blue rounded-full text-[10px] font-black uppercase tracking-[0.2em]">
+                    Objetivo da Campanha
+                </div>
+                <p class="text-2xl font-medium text-zinc-200 leading-relaxed italic">
+                    "${data.objective}"
+                </p>
             </div>
         </div>
 
-        <!-- Roteiros -->
-        <div class="max-w-5xl mx-auto px-6 py-20">
-            ${data.scripts.map((script, index) => `
-                <div class="mb-32 relative">
-                    <div class="absolute -left-12 top-0 text-9xl font-black opacity-5 pointer-events-none select-none" style="color: ${data.primaryColor || '#0047FF'}">${(index + 1).toString().padStart(2, '0')}</div>
-                    <div class="relative z-10">
-                        <header class="mb-12 border-b border-zinc-800 pb-8">
-                            <div class="flex items-center gap-3 mb-4">
-                                <span class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style="background-color: ${data.primaryColor || '#0047FF'}">${index + 1}</span>
-                                <h2 class="text-3xl font-bold tracking-tight">${script.title}</h2>
+        <div class="absolute bottom-12 left-0 w-full flex justify-center gap-12 text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em]">
+            <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 bg-dbe-blue rounded-full"></div> ${data.responsible}</div>
+            <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 bg-zinc-700 rounded-full"></div> ${data.date}</div>
+            <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 bg-zinc-700 rounded-full"></div> ${data.format}</div>
+        </div>
+    </div>
+
+    <!-- Conteúdo -->
+    <div class="max-w-6xl mx-auto px-6 py-32">
+        ${data.scripts.map((script, index) => `
+            <div class="mb-40 relative group">
+                <!-- Número de Fundo -->
+                <div class="absolute -left-20 -top-10 text-[15rem] font-display font-black opacity-[0.03] select-none italic" style="color: ${primaryColor}">
+                    ${(index + 1).toString().padStart(2, '0')}
+                </div>
+
+                <div class="relative z-10">
+                    <header class="mb-16 border-b border-zinc-800/50 pb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+                        <div>
+                            <div class="flex items-center gap-4 mb-4">
+                                <span class="w-12 h-12 rounded-2xl flex items-center justify-center text-black font-black italic text-xl" style="background-color: ${primaryColor}">
+                                    ${index + 1}
+                                </span>
+                                <h2 class="text-4xl md:text-5xl font-display font-black tracking-tight uppercase italic">${script.title}</h2>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div><span class="text-xs uppercase font-bold text-zinc-500 block mb-1">Tema</span><span class="font-medium">${script.theme}</span></div>
-                                <div><span class="text-xs uppercase font-bold text-zinc-500 block mb-1">Público</span><span class="font-medium">${script.audience}</span></div>
-                                <div><span class="text-xs uppercase font-bold text-zinc-500 block mb-1">Tonalidade</span><span class="font-medium">${script.tone}</span></div>
-                            </div>
-                        </header>
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                            <div class="space-y-8">
-                                <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-xl">
-                                    <h3 class="text-xs font-bold uppercase tracking-wider text-green-400 mb-4">Gancho (Hook)</h3>
-                                    <p class="text-lg">${script.hook}</p>
+                            <div class="flex flex-wrap gap-6 text-zinc-500">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-1 h-1 bg-zinc-700 rounded-full"></span>
+                                    <span class="text-[10px] font-bold uppercase tracking-widest">Tema:</span>
+                                    <span class="text-zinc-300 font-medium">${script.theme}</span>
                                 </div>
-                                <div class="p-6 border-l-2 border-zinc-800">
-                                    <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-4">Desenvolvimento</h3>
-                                    <p class="text-lg text-zinc-300">${script.development}</p>
-                                </div>
-                            </div>
-                            <div class="space-y-8">
-                                <div class="p-6 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                                    <h3 class="text-xs font-bold uppercase tracking-wider text-blue-400 mb-4">Call to Action (CTA)</h3>
-                                    <p class="text-xl font-bold">${script.cta}</p>
+                                <div class="flex items-center gap-2">
+                                    <span class="w-1 h-1 bg-zinc-700 rounded-full"></span>
+                                    <span class="text-[10px] font-bold uppercase tracking-widest">Público:</span>
+                                    <span class="text-zinc-300 font-medium">${script.audience}</span>
                                 </div>
                             </div>
                         </div>
-                        <div class="mt-12 space-y-4">
+                        <div class="glass px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-dbe-blue">
+                            Tonalidade: ${script.tone}
+                        </div>
+                    </header>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        <!-- Coluna Principal -->
+                        <div class="lg:col-span-7 space-y-8">
+                            <div class="glass p-8 rounded-[2rem] border-l-4 border-l-dbe-green transition-all hover:translate-x-1">
+                                <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-dbe-green mb-6 flex items-center gap-2">
+                                    <div class="w-2 h-2 bg-dbe-green rounded-full animate-pulse"></div>
+                                    Gancho (Hook)
+                                </h3>
+                                <p class="text-2xl font-display font-bold text-white leading-tight">
+                                    ${script.hook}
+                                </p>
+                            </div>
+
+                            <div class="glass p-8 rounded-[2rem] transition-all hover:translate-x-1">
+                                <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 mb-6">Desenvolvimento</h3>
+                                <div class="text-lg text-zinc-300 leading-relaxed font-medium">
+                                    ${script.development.split('\n').map(p => `<p class="mb-4">${p}</p>`).join('')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Coluna CTA / Info -->
+                        <div class="lg:col-span-5 space-y-8">
+                            <div class="p-8 rounded-[2rem] text-black shadow-[0_20px_50px_rgba(0,144,208,0.2)] transition-all hover:-translate-y-1" style="background-color: ${primaryColor}">
+                                <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-black/50 mb-6">Call to Action</h3>
+                                <p class="text-3xl font-display font-black leading-none uppercase italic">
+                                    ${script.cta}
+                                </p>
+                            </div>
+
                             ${script.notes ? `
-                            <div class="p-4 bg-zinc-900/50 rounded-lg flex gap-3 text-sm text-zinc-400 italic">
-                                <p><strong>Observações de gravação:</strong> ${script.notes}</p>
+                            <div class="glass p-8 rounded-[2rem] border-dashed border-zinc-800">
+                                <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600 mb-4 italic">Observações</h3>
+                                <p class="text-sm text-zinc-400 italic font-medium leading-relaxed">${script.notes}</p>
                             </div>` : ''}
-                            
+
                             ${script.referenceLink ? `
-                            <div class="p-4 bg-zinc-900/50 rounded-lg flex gap-3 text-sm text-blue-400">
-                                <a href="${script.referenceLink}" target="_blank" style="color: ${data.primaryColor || '#0047FF'}">Referência: ${script.referenceLink}</a>
-                            </div>` : ''}
+                            <a href="${script.referenceLink}" target="_blank" class="block glass p-6 rounded-[1.5rem] border-zinc-800 hover:border-dbe-blue/50 transition-all group">
+                                <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600 mb-2">Referência</h3>
+                                <div class="text-xs text-dbe-blue font-bold truncate group-hover:underline">${script.referenceLink}</div>
+                            </a>` : ''}
                         </div>
                     </div>
                 </div>
                 ${index < data.scripts.length - 1 ? '<div class="page-break"></div>' : ''}
-            `).join('')}
-        </div>
-
-        <!-- Footer -->
-        <footer class="p-20 text-center border-t border-zinc-900">
-            <p class="text-zinc-500 font-medium tracking-widest text-sm uppercase">DBE — DOS BASTIDORES AO ESPETÁCULO</p>
-        </footer>
+            </div>
+        `).join('')}
     </div>
+
+    <!-- Rodapé Premium -->
+    <footer class="py-32 px-8 text-center border-t border-zinc-900 relative overflow-hidden">
+        <div class="absolute inset-0 bg-dbe-blue/5 blur-[120px] rounded-full -bottom-1/2"></div>
+        <div class="relative z-10">
+            <div class="mb-6 opacity-30">
+                <div class="w-10 h-10 rounded-lg bg-white mx-auto"></div>
+            </div>
+            <p class="text-[10px] font-black uppercase tracking-[0.5em] text-zinc-600">
+                Dos Bastidores ao Espetáculo &copy; 2026
+            </p>
+        </div>
+    </footer>
 </body>
 </html>
   `;
