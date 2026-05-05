@@ -9,54 +9,40 @@ export const useStorage = () => {
   const [presentations, setPresentations] = useState<Presentation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Função utilitária para envio via Form POST invisível (Ignora CORS)
-  const submitToGoogleScript = (payload: any) => {
-    console.log('[Cloud Sync] Preparando envio para Google Sheets:', payload);
+  // Função utilitária para envio via fetch no-cors com FormData
+  const submitToGoogleScript = async (payload: unknown) => {
+    console.log('[Cloud Sync] Enviando payload via fetch no-cors:', payload);
 
-    let iframe = document.querySelector<HTMLIFrameElement>('iframe[name="hidden_google_sheets_iframe"]');
+    const formData = new FormData();
+    formData.append('payload', JSON.stringify(payload));
 
-    if (!iframe) {
-      iframe = document.createElement('iframe');
-      iframe.name = 'hidden_google_sheets_iframe';
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-    }
+    await fetch(CLOUD_API_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: formData,
+    });
 
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = CLOUD_API_URL;
-    form.target = 'hidden_google_sheets_iframe';
-    form.style.display = 'none';
-
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'payload';
-    input.value = JSON.stringify(payload);
-
-    form.appendChild(input);
-    document.body.appendChild(form);
-
-    form.submit();
-
-    setTimeout(() => {
-      if (form.parentNode) {
-        form.parentNode.removeChild(form);
-      }
-    }, 1000);
-
-    console.log('[Cloud Sync] Form POST enviado.');
+    console.log('[Cloud Sync] POST no-cors enviado para Apps Script.');
   };
 
   // Função para salvar na nuvem (Sheets)
-  const saveToCloud = (presentation: Presentation) => {
-    console.log('[Cloud Sync] Enviando apresentação para Google Sheets');
-    submitToGoogleScript(presentation);
+  const saveToCloud = async (presentation: Presentation) => {
+    try {
+      console.log('[Cloud Sync] Enviando apresentação para Google Sheets');
+      await submitToGoogleScript(presentation);
+    } catch (error) {
+      console.error('[Cloud Sync] Erro ao enviar apresentação:', error);
+    }
   };
 
   // Função para deletar da nuvem
-  const deleteFromCloud = (id: string) => {
-    console.log('[Cloud Sync] Enviando exclusão para Google Sheets');
-    submitToGoogleScript({ action: 'delete', id });
+  const deleteFromCloud = async (id: string) => {
+    try {
+      console.log('[Cloud Sync] Enviando exclusão para Google Sheets');
+      await submitToGoogleScript({ action: 'delete', id });
+    } catch (error) {
+      console.error('[Cloud Sync] Erro ao excluir apresentação:', error);
+    }
   };
 
   // Função para carregar da nuvem
@@ -99,8 +85,8 @@ export const useStorage = () => {
     }
 
     // Tenta carregar da nuvem para manter atualizado
-    fetchFromCloud();
-  }, [fetchFromCloud]);
+    // fetchFromCloud(); // Comentado temporariamente para depuração do POST
+  }, []);
 
   const savePresentation = useCallback((presentation: Presentation) => {
     // 1. Salva localmente primeiro (garante funcionamento offline e velocidade)
