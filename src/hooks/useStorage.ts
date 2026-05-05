@@ -133,8 +133,7 @@ export const useStorage = () => {
     fetchFromCloud();
   }, [fetchFromCloud]);
 
-  const savePresentation = useCallback((presentation: Presentation) => {
-    // 1. Salva localmente primeiro (garante funcionamento offline e velocidade)
+  const savePresentationLocal = useCallback((presentation: Presentation) => {
     setPresentations(prev => {
       const index = prev.findIndex(p => p.id === presentation.id);
       let updated: Presentation[];
@@ -149,10 +148,15 @@ export const useStorage = () => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
+  }, []);
+
+  const savePresentation = useCallback((presentation: Presentation) => {
+    // 1. Salva localmente primeiro (garante funcionamento offline e velocidade)
+    savePresentationLocal(presentation);
 
     // 2. Tenta sincronizar com a nuvem
     saveToCloud(presentation);
-  }, []);
+  }, [savePresentationLocal]);
 
   const deletePresentation = useCallback((id: string) => {
     setPresentations(prev => {
@@ -187,6 +191,7 @@ export const useStorage = () => {
     presentations,
     isLoading,
     savePresentation,
+    savePresentationLocal,
     deletePresentation,
     duplicatePresentation,
     getPresentation,

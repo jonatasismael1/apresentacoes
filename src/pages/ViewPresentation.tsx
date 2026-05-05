@@ -135,7 +135,7 @@ const ViewPresentation: React.FC = () => {
                   className="btn-secondary"
                 >
                   <Printer size={18} />
-                  Imprimir
+                  Baixar PDF
                 </button>
                 <button onClick={() => setShowTeleprompter(false)} className="btn-ghost bg-zinc-900 rounded-full p-2">
                   <X size={24} />

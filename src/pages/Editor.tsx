@@ -5,17 +5,19 @@ import { useToast } from '../components/Toast';
 import type { Presentation, Script } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { 
-  ArrowLeft, Save, Plus, Trash2, ChevronUp, ChevronDown, 
-  Copy, Layout, Eye, Settings
+  ArrowLeft, Save, Plus, Trash2, 
+  Copy, Layout, Eye, Settings, GripVertical
 } from 'lucide-react';
 import LogoUpload from '../components/LogoUpload';
 import PresentationPreview from '../components/PresentationPreview';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import type { DropResult } from '@hello-pangea/dnd';
 
 const Editor: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getPresentation, savePresentation } = useStorage();
+  const { getPresentation, savePresentation, savePresentationLocal } = useStorage();
   const { showToast } = useToast();
   const hasLoaded = useRef(false);
 
@@ -36,6 +38,8 @@ const Editor: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dados' | 'roteiros'>('dados');
   const [showPreview, setShowPreview] = useState(true);
 
+  const [isSaving, setIsSaving] = useState(false);
+
   useEffect(() => {
     if (id && !hasLoaded.current) {
       const existing = getPresentation(id);
@@ -51,6 +55,19 @@ const Editor: React.FC = () => {
       setIsLoading(false);
     }
   }, [id, getPresentation]);
+
+  // Auto-save debounce effect
+  useEffect(() => {
+    if (!hasLoaded.current || isLoading) return; // Only auto-save after initial load
+
+    const timer = setTimeout(() => {
+      setIsSaving(true);
+      savePresentationLocal(formData);
+      setTimeout(() => setIsSaving(false), 800); // Visual cue duration
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [formData, savePresentationLocal, isLoading]);
 
   if (isLoading) {
     return (
@@ -111,13 +128,19 @@ const Editor: React.FC = () => {
     showToast('Roteiro removido', 'info');
   };
 
-  const moveScript = (index: number, direction: 'up' | 'down') => {
-    const newScripts = [...formData.scripts];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex >= 0 && targetIndex < newScripts.length) {
-      [newScripts[index], newScripts[targetIndex]] = [newScripts[targetIndex], newScripts[index]];
-      setFormData(prev => ({ ...prev, scripts: newScripts }));
-    }
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    const sourceIndex = result.source.index;
+    const destinationIndex = result.destination.index;
+
+    if (sourceIndex === destinationIndex) return;
+
+    setFormData(prev => {
+      const newScripts = Array.from(prev.scripts);
+      const [movedScript] = newScripts.splice(sourceIndex, 1);
+      newScripts.splice(destinationIndex, 0, movedScript);
+      return { ...prev, scripts: newScripts };
+    });
   };
 
   const duplicateScript = (script: Script) => {
@@ -137,6 +160,11 @@ const Editor: React.FC = () => {
           <h1 className="font-bold hidden md:block">
             {id ? 'Editar Apresentação' : 'Nova Apresentação'}
           </h1>
+          {isSaving && (
+            <span className="text-xs font-bold text-dbe-blue ml-2 animate-pulse bg-dbe-blue/10 px-2 py-1 rounded">
+              Salvando...
+            </span>
+          )}
         </div>
         
         <div className="flex items-center gap-3">
@@ -288,80 +316,100 @@ const Editor: React.FC = () => {
                   Adicionar Roteiro
                 </button>
 
-                <AnimatePresence>
-                  {formData.scripts.map((script, index) => (
-                    <motion.div 
-                      key={script.id}
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="card p-4 border-zinc-700 space-y-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold bg-zinc-800 px-2 py-1 rounded text-zinc-400">#{index + 1}</span>
-                        <div className="flex gap-1">
-                          <button onClick={() => moveScript(index, 'up')} disabled={index === 0} className="btn-ghost p-1 disabled:opacity-30"><ChevronUp size={14} /></button>
-                          <button onClick={() => moveScript(index, 'down')} disabled={index === formData.scripts.length - 1} className="btn-ghost p-1 disabled:opacity-30"><ChevronDown size={14} /></button>
-                          <button onClick={() => duplicateScript(script)} className="btn-ghost p-1"><Copy size={14} /></button>
-                          <button onClick={() => deleteScript(script.id)} className="btn-ghost p-1 hover:text-red-500"><Trash2 size={14} /></button>
-                        </div>
-                      </div>
+                <DragDropContext onDragEnd={onDragEnd}>
+                  <Droppable droppableId="scripts-list">
+                    {(provided) => (
+                      <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-4">
+                        <AnimatePresence>
+                          {formData.scripts.map((script, index) => (
+                            <Draggable key={script.id} draggableId={script.id} index={index}>
+                              {(provided, snapshot) => (
+                                <motion.div 
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  initial={{ opacity: 0, height: 0 }}
+                                  animate={{ opacity: 1, height: 'auto' }}
+                                  exit={{ opacity: 0, height: 0 }}
+                                  className={`card p-4 border-zinc-700 space-y-4 ${snapshot.isDragging ? 'shadow-2xl border-dbe-blue/50 ring-2 ring-dbe-blue/20 bg-zinc-900/90 backdrop-blur-xl' : ''}`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <div 
+                                        {...provided.dragHandleProps}
+                                        className="cursor-grab active:cursor-grabbing p-1 hover:bg-zinc-800 rounded text-zinc-500"
+                                      >
+                                        <GripVertical size={16} />
+                                      </div>
+                                      <span className="text-xs font-bold bg-zinc-800 px-2 py-1 rounded text-zinc-400">#{index + 1}</span>
+                                    </div>
+                                    <div className="flex gap-1">
+                                      <button onClick={() => duplicateScript(script)} className="btn-ghost p-1"><Copy size={14} /></button>
+                                      <button onClick={() => deleteScript(script.id)} className="btn-ghost p-1 hover:text-red-500"><Trash2 size={14} /></button>
+                                    </div>
+                                  </div>
 
-                      <div className="space-y-3">
-                        <input 
-                          placeholder="Título do roteiro" 
-                          className="input-field py-1 px-2 text-sm font-bold"
-                          value={script.title}
-                          onChange={(e) => updateScript(script.id, { title: e.target.value })}
-                        />
-                        <div className="grid grid-cols-2 gap-2">
-                          <input 
-                            placeholder="Tema" 
-                            className="input-field py-1 px-2 text-xs"
-                            value={script.theme}
-                            onChange={(e) => updateScript(script.id, { theme: e.target.value })}
-                          />
-                          <input 
-                            placeholder="Tonalidade" 
-                            className="input-field py-1 px-2 text-xs"
-                            value={script.tone}
-                            onChange={(e) => updateScript(script.id, { tone: e.target.value })}
-                          />
-                        </div>
-                        <textarea 
-                          placeholder="Gancho (Hook)" 
-                          className="input-field text-xs min-h-[60px]"
-                          value={script.hook}
-                          onChange={(e) => updateScript(script.id, { hook: e.target.value })}
-                        />
-                        <textarea 
-                          placeholder="Desenvolvimento" 
-                          className="input-field text-xs min-h-[80px]"
-                          value={script.development}
-                          onChange={(e) => updateScript(script.id, { development: e.target.value })}
-                        />
-                        <input 
-                          placeholder="CTA" 
-                          className="input-field py-1 px-2 text-xs font-bold"
-                          value={script.cta}
-                          onChange={(e) => updateScript(script.id, { cta: e.target.value })}
-                        />
-                        <textarea 
-                          placeholder="Observações de gravação" 
-                          className="input-field text-xs min-h-[40px] italic"
-                          value={script.notes}
-                          onChange={(e) => updateScript(script.id, { notes: e.target.value })}
-                        />
-                        <input 
-                          placeholder="Link de Referência (Opcional)" 
-                          className="input-field py-1 px-2 text-xs"
-                          value={script.referenceLink || ''}
-                          onChange={(e) => updateScript(script.id, { referenceLink: e.target.value })}
-                        />
+                                  <div className="space-y-3">
+                                    <input 
+                                      placeholder="Título do roteiro" 
+                                      className="input-field py-1 px-2 text-sm font-bold"
+                                      value={script.title}
+                                      onChange={(e) => updateScript(script.id, { title: e.target.value })}
+                                    />
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <input 
+                                        placeholder="Tema" 
+                                        className="input-field py-1 px-2 text-xs"
+                                        value={script.theme}
+                                        onChange={(e) => updateScript(script.id, { theme: e.target.value })}
+                                      />
+                                      <input 
+                                        placeholder="Tonalidade" 
+                                        className="input-field py-1 px-2 text-xs"
+                                        value={script.tone}
+                                        onChange={(e) => updateScript(script.id, { tone: e.target.value })}
+                                      />
+                                    </div>
+                                    <textarea 
+                                      placeholder="Gancho (Hook)" 
+                                      className="input-field text-xs min-h-[60px]"
+                                      value={script.hook}
+                                      onChange={(e) => updateScript(script.id, { hook: e.target.value })}
+                                    />
+                                    <textarea 
+                                      placeholder="Desenvolvimento" 
+                                      className="input-field text-xs min-h-[80px]"
+                                      value={script.development}
+                                      onChange={(e) => updateScript(script.id, { development: e.target.value })}
+                                    />
+                                    <input 
+                                      placeholder="CTA" 
+                                      className="input-field py-1 px-2 text-xs font-bold"
+                                      value={script.cta}
+                                      onChange={(e) => updateScript(script.id, { cta: e.target.value })}
+                                    />
+                                    <textarea 
+                                      placeholder="Observações de gravação" 
+                                      className="input-field text-xs min-h-[40px] italic"
+                                      value={script.notes}
+                                      onChange={(e) => updateScript(script.id, { notes: e.target.value })}
+                                    />
+                                    <input 
+                                      placeholder="Link de Referência (Opcional)" 
+                                      className="input-field py-1 px-2 text-xs"
+                                      value={script.referenceLink || ''}
+                                      onChange={(e) => updateScript(script.id, { referenceLink: e.target.value })}
+                                    />
+                                  </div>
+                                </motion.div>
+                              )}
+                            </Draggable>
+                          ))}
+                        </AnimatePresence>
+                        {provided.placeholder}
                       </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
+                    )}
+                  </Droppable>
+                </DragDropContext>
                 
                 {formData.scripts.length > 0 && (
                   <button onClick={addScript} className="btn-secondary w-full py-3">
