@@ -23,6 +23,7 @@ const ViewPresentation: React.FC = () => {
   const [showDebug, setShowDebug] = useState(true);
   const [debugLog, setDebugLog] = useState<KeyDebugInfo[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   const SPEED_MIN = 1;
   const SPEED_MAX = 10;
@@ -68,6 +69,7 @@ const ViewPresentation: React.FC = () => {
 
   useTeleprompterKeys({
     active: showTeleprompter,
+    containerRef,
     onScrollUp:        handleScrollUp,
     onScrollDown:      handleScrollDown,
     onSpeedDecrease:   handleSpeedDec,
@@ -182,10 +184,13 @@ const ViewPresentation: React.FC = () => {
       <AnimatePresence>
         {showTeleprompter && (
           <motion.div
+            ref={containerRef}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black flex flex-col"
+            className="fixed inset-0 z-[100] bg-black flex flex-col outline-none"
+            tabIndex={-1}
+            onKeyDown={(e) => e.stopPropagation()}
           >
             {/* ── Barra superior ── */}
             <div className="flex items-center justify-between px-5 py-3 bg-zinc-950/90 backdrop-blur border-b border-zinc-800 no-print shrink-0">
@@ -230,6 +235,15 @@ const ViewPresentation: React.FC = () => {
                 >
                   {isPlaying ? <Pause size={16} /> : <Play size={16} />}
                   {isPlaying ? 'Pausar' : 'Reproduzir'}
+                </button>
+
+                {/* Re-focar container (útil se o foco sair) */}
+                <button
+                  onClick={() => containerRef.current?.focus({ preventScroll: true })}
+                  className="p-2 bg-zinc-900 rounded-full text-zinc-500 hover:text-white transition-all border border-zinc-700"
+                  title="Re-focar teleprompter (necessário para o controle BT funcionar)"
+                >
+                  🎯
                 </button>
 
                 {/* Debug toggle */}
@@ -303,6 +317,12 @@ const ViewPresentation: React.FC = () => {
                       <p className="text-[10px] text-zinc-500 mt-0.5">
                         Pressione qualquer tecla / botão do controle
                       </p>
+                      <button
+                        onClick={() => containerRef.current?.focus({ preventScroll: true })}
+                        className="mt-2 w-full text-[10px] py-1 px-2 bg-violet-900/50 hover:bg-violet-800/60 text-violet-300 rounded border border-violet-700/50 transition-colors"
+                      >
+                        🎯 Clicar aqui se o controle não responder
+                      </button>
                     </div>
 
                     {/* Última tecla em destaque */}
@@ -329,6 +349,13 @@ const ViewPresentation: React.FC = () => {
                             <span className={`text-[11px] font-mono font-bold ${
                               debugLog[0].type === 'keydown' ? 'text-amber-300' : 'text-zinc-400'
                             }`}>{debugLog[0].type}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[11px] text-zinc-400">fonte</span>
+                            <span className={`text-[11px] font-mono font-bold ${
+                              debugLog[0].source === 'keycode' ? 'text-orange-300' :
+                              debugLog[0].source === 'gamepad' ? 'text-pink-300' : 'text-cyan-300'
+                            }`}>{debugLog[0].source}</span>
                           </div>
                           {debugLog[0].action && (
                             <div className="flex justify-between">
