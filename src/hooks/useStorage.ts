@@ -3,7 +3,7 @@ import type { Presentation } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
 const STORAGE_KEY = 'dbe_apresentacoes';
-const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbyC05QIQ1oisATuXMydDMKTGYzngOJ8y88FKGeXuvAP0JzXHnWy6NWd8oU6U1HQTXw/exec';
+const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbzkC1VpVms9WF940ZroVzmrz9KjKvq7aQRs7oQylkkfqw1_tXQFhaI8mIoMpI1_11A7/exec';
 
 export const useStorage = () => {
   const [presentations, setPresentations] = useState<Presentation[]>([]);
