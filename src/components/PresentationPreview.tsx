@@ -1,7 +1,37 @@
-import React from 'react';
-import type { Presentation } from '../types';
-import { Video, Target, User, Calendar, Play, MessageSquare, AlertCircle, ExternalLink } from 'lucide-react';
+import React, { useState } from 'react';
+import type { Presentation, Script } from '../types';
+import { Video, Target, User, Calendar, Play, MessageSquare, AlertCircle, ExternalLink, Copy, Check } from 'lucide-react';
 import DBELogo from './DBELogo';
+
+const CopyScriptButton = ({ script }: { script: Script }) => {
+  const [copied, setCopied] = useState(false);
+  
+  const handleCopy = () => {
+    const text = `ROTEIRO: ${script.title || 'Sem título'}\n` +
+      `Tema: ${script.theme || '—'}\n` +
+      `Público: ${script.audience || '—'}\n` +
+      `Tonalidade: ${script.tone || '—'}\n\n` +
+      `Gancho:\n${script.hook || '—'}\n\n` +
+      `Desenvolvimento:\n${script.development || '—'}\n\n` +
+      `CTA:\n${script.cta || '—'}\n\n` +
+      (script.notes ? `Observações:\n${script.notes}\n\n` : '') +
+      (script.referenceLink ? `Referência:\n${script.referenceLink}\n` : '');
+    
+    navigator.clipboard.writeText(text.trim());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <button 
+      onClick={handleCopy} 
+      className="p-2 ml-2 hover:bg-zinc-800 rounded-full transition-colors text-zinc-500 hover:text-white no-print"
+      title="Copiar roteiro completo"
+    >
+      {copied ? <Check size={24} className="text-green-500" /> : <Copy size={24} />}
+    </button>
+  );
+};
 
 interface PreviewProps {
   data: Presentation;
@@ -14,7 +44,7 @@ const PresentationPreview: React.FC<PreviewProps> = ({ data, isPrint = false }) 
   return (
     <div className={`w-full mx-auto ${isPrint ? 'bg-white text-black' : 'bg-zinc-950 text-white min-h-screen'}`}>
       {/* Cover */}
-      <section className="relative h-[600px] flex flex-col items-center justify-center text-center p-8 overflow-hidden">
+      <section className="relative min-h-[600px] flex flex-col items-center justify-center text-center p-8 overflow-hidden">
         {/* Background Accent */}
         {!isPrint && (
           <div 
@@ -52,20 +82,20 @@ const PresentationPreview: React.FC<PreviewProps> = ({ data, isPrint = false }) 
               </p>
             </div>
           )}
-        </div>
 
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-8 text-xs font-medium text-zinc-500">
-          <div className="flex items-center gap-2">
-            <User size={14} />
-            {data.responsible || 'Responsável'}
-          </div>
-          <div className="flex items-center gap-2">
-            <Calendar size={14} />
-            {data.date || 'Data'}
-          </div>
-          <div className="flex items-center gap-2">
-            <Video size={14} />
-            {data.format || 'Formato'}
+          <div className="mt-16 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-xs font-medium text-zinc-500">
+            <div className="flex items-center gap-2">
+              <User size={14} />
+              {data.responsible || 'Responsável'}
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar size={14} />
+              {data.date || 'Data'}
+            </div>
+            <div className="flex items-center gap-2">
+              <Video size={14} />
+              {data.format || 'Formato'}
+            </div>
           </div>
         </div>
       </section>
@@ -91,7 +121,10 @@ const PresentationPreview: React.FC<PreviewProps> = ({ data, isPrint = false }) 
                   >
                     {index + 1}
                   </span>
-                  <h2 className="text-4xl font-display font-black tracking-tight uppercase italic">{script.title || `Roteiro ${index + 1}`}</h2>
+                  <h2 className="text-4xl font-display font-black tracking-tight uppercase italic flex items-center">
+                    {script.title || `Roteiro ${index + 1}`}
+                    <CopyScriptButton script={script} />
+                  </h2>
                 </div>
                 <DBELogo className="h-8 opacity-50 hidden sm:block" />
               </header>
