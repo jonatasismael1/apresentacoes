@@ -217,7 +217,7 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
             exit={{ opacity: 0, y: 50 }}
             className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-20 w-auto max-w-[95vw]"
           >
-            <div className="flex items-center gap-1.5 sm:gap-3 bg-zinc-900/95 backdrop-blur-xl p-1.5 sm:p-2 rounded-full sm:rounded-2xl border border-zinc-800 shadow-2xl">
+            <div className="flex flex-wrap justify-center items-center gap-1.5 sm:gap-3 bg-zinc-900/95 backdrop-blur-xl p-2 sm:p-2 rounded-2xl border border-zinc-800 shadow-2xl">
               <button 
                 onClick={handleReset}
                 className="p-2 sm:p-3 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"

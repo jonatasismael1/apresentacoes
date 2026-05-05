@@ -6,6 +6,7 @@ import { ArrowLeft, Download, Printer, Copy, FileCode, Edit2, Monitor, X } from 
 import PresentationPreview from '../components/PresentationPreview';
 import type { Presentation } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { dbeLogoBase64 } from '../constants/dbeLogo';
 
 const ViewPresentation: React.FC = () => {
   const { id } = useParams();
@@ -410,29 +411,26 @@ const generateStandaloneHTML = (data: Presentation) => {
 </head>
 <body class="bg-mesh">
     <!-- Capa Premium -->
-    <div class="cover flex flex-col items-center justify-center relative overflow-hidden">
-              <div class="logo-frame">
-                ${clientLogo ? `<img src="${clientLogo}" alt="Logo do cliente" />` : `<div style="font-weight:900;color:${primaryColor};font-size:1.25rem;">DBE</div>`}
-              </div>
-              <div class="tagline">${data.clientSegment || 'Identidade Visual'}</div>
-            </div>
+    <div class="cover flex flex-col items-center justify-center relative overflow-hidden text-center">
+        <img src="${dbeLogoBase64}" alt="DBE" style="height: 6rem; margin-bottom: 3rem; opacity: 0.9;" />
+        
+        <h1 class="title-main">${data.title}</h1>
 
-            <h1 class="title-main">${data.title}</h1>
-
-            <div class="flex items-center justify-center gap-4 mb-12">
-                <div class="capsule tag-blue">${data.clientName}</div>
-                <div class="capsule tag-zinc">${data.clientSegment}</div>
-            </div>
-
-            <div class="glass" style="padding: 3rem; max-width: 600px; margin: 0 auto; position: relative;">
-                <div style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: ${primaryColor}; padding: 4px 16px; border-radius: 20px; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em;">
-                    Objetivo da Campanha
-                </div>
-                <p style="font-size: 1.25rem; color: #ccc; font-style: italic; line-height: 1.6;">
-                    "${data.objective}"
-                </p>
-            </div>
+        <div class="flex items-center justify-center gap-4 mb-12">
+            <div class="capsule tag-blue">${data.clientName}</div>
+            <div class="capsule tag-zinc">${data.clientSegment}</div>
         </div>
+
+        ${data.objective ? `
+        <div class="glass" style="padding: 2rem; max-width: 600px; margin: 0 auto; position: relative;">
+            <div style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: ${primaryColor}; padding: 4px 16px; border-radius: 20px; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #fff;">
+                Objetivo da Campanha
+            </div>
+            <p style="font-size: 1.25rem; color: #ccc; line-height: 1.6;">
+                ${data.objective}
+            </p>
+        </div>
+        ` : ''}
 
         <div style="position: absolute; bottom: 3rem; width: 100%; display: flex; justify-center; gap: 3rem; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; color: #555; justify-content: center;">
             <span>${data.responsible}</span>
@@ -448,9 +446,12 @@ const generateStandaloneHTML = (data: Presentation) => {
                 <div class="script-number">${(index + 1).toString().padStart(2, '0')}</div>
 
                 <div class="relative">
-                    <header class="script-header">
-                        <div class="index-box">${index + 1}</div>
-                        <h2 class="script-title">${script.title}</h2>
+                    <header class="script-header" style="justify-content: space-between;">
+                        <div class="flex items-center" style="gap: 1.5rem;">
+                            <div class="index-box">${index + 1}</div>
+                            <h2 class="script-title">${script.title}</h2>
+                        </div>
+                        <img src="${dbeLogoBase64}" alt="DBE" style="height: 2rem; opacity: 0.5;" />
                     </header>
 
                     <div class="grid-container">

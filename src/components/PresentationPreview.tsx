@@ -83,7 +83,7 @@ const PresentationPreview: React.FC<PreviewProps> = ({ data, isPrint = false }) 
             </div>
 
             <div className="relative z-10">
-              <header className="mb-12 border-b border-zinc-800 pb-8" style={{ borderColor: isPrint ? '#eee' : undefined }}>
+              <header className="mb-12 border-b border-zinc-800 pb-8 flex justify-between items-start" style={{ borderColor: isPrint ? '#eee' : undefined }}>
                 <div className="flex items-center gap-3 mb-4">
                   <span 
                     className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black font-display"
@@ -93,8 +93,10 @@ const PresentationPreview: React.FC<PreviewProps> = ({ data, isPrint = false }) 
                   </span>
                   <h2 className="text-4xl font-display font-black tracking-tight uppercase italic">{script.title || `Roteiro ${index + 1}`}</h2>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <DBELogo className="h-8 opacity-50 hidden sm:block" />
+              </header>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
                   <div className="flex flex-col">
                     <span className="text-xs uppercase font-bold text-zinc-500 mb-1">Tema</span>
                     <span className="font-medium">{script.theme || '—'}</span>
