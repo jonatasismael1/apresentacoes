@@ -353,8 +353,7 @@ const ViewPresentation: React.FC = () => {
                           <div className="flex justify-between">
                             <span className="text-[11px] text-zinc-400">fonte</span>
                             <span className={`text-[11px] font-mono font-bold ${
-                              debugLog[0].source === 'keycode' ? 'text-orange-300' :
-                              debugLog[0].source === 'gamepad' ? 'text-pink-300' : 'text-cyan-300'
+                              debugLog[0].source === 'keycode' ? 'text-orange-300' : 'text-cyan-300'
                             }`}>{debugLog[0].source}</span>
                           </div>
                           {debugLog[0].action && (
