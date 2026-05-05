@@ -163,6 +163,8 @@ const ViewPresentation: React.FC = () => {
 // Function to generate a standalone HTML file
 const generateStandaloneHTML = (data: Presentation) => {
   const primaryColor = data.primaryColor || '#0090D0';
+  const secondaryColor = data.secondaryColor || '#22C55E';
+  const clientLogo = data.clientLogo ? `data:image/png;base64,${data.clientLogo.split(',').pop()}` : '';
   
   return `
 <!DOCTYPE html>
@@ -227,7 +229,7 @@ const generateStandaloneHTML = (data: Presentation) => {
           letter-spacing: 0.1em;
         }
 
-        .tag-blue { background: rgba(0, 144, 208, 0.1); color: #0090D0; border: 1px solid rgba(0, 144, 208, 0.2); }
+        .tag-blue { background: ${secondaryColor}1a; color: ${secondaryColor}; border: 1px solid ${secondaryColor}33; }
         .tag-zinc { background: rgba(39, 39, 42, 0.5); color: #a1a1aa; border: 1px solid #27272a; }
 
         /* TYPOGRAPHY */
@@ -317,6 +319,31 @@ const generateStandaloneHTML = (data: Presentation) => {
         }
         .cta-label { opacity: 0.5; font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 1rem; display: block;}
         .cta-text { font-size: 2rem; font-weight: 900; text-transform: uppercase; font-style: italic; line-height: 1; }
+        .logo-frame {
+          width: 120px;
+          height: 120px;
+          border-radius: 28px;
+          background: rgba(255,255,255,0.08);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 1.5rem;
+          box-shadow: 0 24px 60px rgba(0,0,0,0.25);
+        }
+        .logo-frame img {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
+          border-radius: 18px;
+        }
+        .tagline {
+          font-size: 0.75rem;
+          font-weight: 900;
+          letter-spacing: 0.25em;
+          color: #999;
+          text-transform: uppercase;
+          margin-bottom: 1.5rem;
+        }
 
         @media print {
           body { background: #fff; color: #000; }
@@ -333,16 +360,11 @@ const generateStandaloneHTML = (data: Presentation) => {
     <!-- Capa Premium -->
     <div class="min-h-screen flex flex-col items-center justify-center p-8 relative overflow-hidden">
         <div class="relative z-10 w-full max-w-4xl mx-auto text-center">
-            <div class="mb-12 flex justify-center">
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                  <div style="width: 60px; height: 60px; background: ${primaryColor}; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-style: italic; color: #000; font-size: 20px;">
-                    DBE
-                  </div>
-                  <div style="text-align: left;">
-                    <div style="font-size: 10px; font-weight: 900; letter-spacing: 0.2em; color: #666; text-transform: uppercase;">Dos Bastidores</div>
-                    <div style="font-size: 10px; font-weight: 900; letter-spacing: 0.2em; color: #666; text-transform: uppercase;">Ao Espetáculo</div>
-                  </div>
-                </div>
+            <div class="mb-12 flex flex-col items-center justify-center">
+              <div class="logo-frame">
+                ${clientLogo ? `<img src="${clientLogo}" alt="Logo do cliente" />` : `<div style="font-weight:900;color:${primaryColor};font-size:1.25rem;">DBE</div>`}
+              </div>
+              <div class="tagline">${data.clientSegment || 'Identidade Visual'}</div>
             </div>
 
             <h1 class="title-main">${data.title}</h1>
@@ -423,6 +445,7 @@ const generateStandaloneHTML = (data: Presentation) => {
 
     <!-- Rodapé -->
     <footer style="padding: 8rem 2rem; text-align: center; border-top: 1px solid #111;">
+        ${clientLogo ? `<img src="${clientLogo}" alt="Logo do cliente" style="max-height: 56px; margin-bottom: 1.5rem; filter: grayscale(60%) opacity(0.65);" />` : ''}
         <p style="font-size: 10px; font-weight: 900; letter-spacing: 0.5em; color: #333; text-transform: uppercase;">
             Dos Bastidores ao Espetáculo &copy; 2026
         </p>
