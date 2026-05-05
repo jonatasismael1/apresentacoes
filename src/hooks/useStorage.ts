@@ -43,9 +43,12 @@ const fetchJsonp = <T,>(url: string): Promise<T> => {
   });
 };
 
+const EXAMPLE_FLAG = 'dbe_is_example';
+
 export const useStorage = () => {
   const [presentations, setPresentations] = useState<Presentation[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // Função utilitária para envio via fetch no-cors com FormData
   const submitToGoogleScript = async (payload: unknown) => {
@@ -86,29 +89,40 @@ export const useStorage = () => {
   // Função para carregar da nuvem via JSONP (Bypasses CORS)
   const fetchFromCloud = useCallback(async () => {
     setIsLoading(true);
+    setSyncError(null);
 
     try {
       console.log('[Cloud Sync] Buscando dados da nuvem via JSONP...');
 
       const cloudData = await fetchJsonp<Presentation[] | { status: string; message?: string }>(CLOUD_API_URL);
 
-      if (Array.isArray(cloudData)) {
+      if (Array.isArray(cloudData) && cloudData.length > 0) {
         console.log(`[Cloud Sync] ${cloudData.length} apresentações carregadas da nuvem.`);
-
+        // Cloud data ALWAYS wins - overwrite everything including example data
         setPresentations(cloudData);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
+        localStorage.removeItem(EXAMPLE_FLAG); // Mark as real data
+        return;
+      }
+
+      if (Array.isArray(cloudData) && cloudData.length === 0) {
+        console.log('[Cloud Sync] Nuvem retornou lista vazia — mantendo dados locais.');
         return;
       }
 
       if (cloudData && (cloudData as any).status === 'error') {
-        console.error('[Cloud Sync] Erro retornado pelo Apps Script:', (cloudData as any).message);
+        const msg = (cloudData as any).message || 'Erro desconhecido';
+        console.error('[Cloud Sync] Erro retornado pelo Apps Script:', msg);
+        setSyncError(msg);
         return;
       }
 
       console.error('[Cloud Sync] Resposta inesperada da nuvem:', cloudData);
 
     } catch (error) {
-      console.error('[Cloud Sync] Erro ao carregar dados via JSONP:', error);
+      const msg = error instanceof Error ? error.message : 'Falha de conexão';
+      console.error('[Cloud Sync] Erro ao carregar dados via JSONP:', msg);
+      setSyncError(msg);
     } finally {
       setIsLoading(false);
     }
@@ -116,20 +130,22 @@ export const useStorage = () => {
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
+    const isExample = localStorage.getItem(EXAMPLE_FLAG) === '1';
     
-    if (stored) {
+    if (stored && !isExample) {
+      // Has real local data — show immediately while we refresh from cloud
       try {
         setPresentations(JSON.parse(stored));
       } catch (e) {
         console.error('Erro ao carregar dados do localStorage', e);
       }
     } else {
-      const example = getExampleData();
-      setPresentations(example);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(example));
+      // No data or only example: show empty list while cloud loads
+      // Don't populate example data to avoid confusion
+      setPresentations([]);
     }
 
-    // Tenta carregar da nuvem para manter atualizado entre dispositivos
+    // Always fetch from cloud on startup
     fetchFromCloud();
   }, [fetchFromCloud]);
 
@@ -146,6 +162,7 @@ export const useStorage = () => {
       }
       
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      localStorage.removeItem(EXAMPLE_FLAG); // Any save marks data as real
       return updated;
     });
   }, []);
@@ -190,6 +207,7 @@ export const useStorage = () => {
   return {
     presentations,
     isLoading,
+    syncError,
     savePresentation,
     savePresentationLocal,
     deletePresentation,
@@ -199,32 +217,3 @@ export const useStorage = () => {
   };
 };
 
-const getExampleData = (): Presentation[] => {
-  return [
-    {
-      id: uuidv4(),
-      clientName: 'Cliente Exemplo',
-      clientSegment: 'Tecnologia',
-      title: 'Campanha de Lançamento 2026',
-      objective: 'Apresentar as novas funcionalidades do software para o mercado B2B.',
-      format: 'Reels / TikTok',
-      responsible: 'Equipe DBE',
-      date: new Date().toLocaleDateString('pt-BR'),
-      scripts: [
-        {
-          id: uuidv4(),
-          title: 'Vídeo 1: A Dor do Cliente',
-          theme: 'Problemas de produtividade',
-          audience: 'Gestores de TI',
-          tone: 'Profissional e Empático',
-          hook: 'Você já sentiu que sua equipe está perdendo tempo com processos manuais?',
-          development: 'Muitas empresas sofrem com a falta de integração entre ferramentas.',
-          cta: 'Clique no link da bio para testar grátis.',
-          notes: 'Gravar em ambiente de escritório moderno.',
-          referenceLink: 'https://youtube.com/exemplo1'
-        }
-      ],
-      createdAt: new Date().toISOString(),
-    }
-  ];
-};

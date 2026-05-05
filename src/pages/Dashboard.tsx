@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStorage } from '../hooks/useStorage';
 import { useToast } from '../components/Toast';
-import { Plus, Edit2, Copy, Trash2, Eye, Search, FileText, Monitor, Zap } from 'lucide-react';
+import { Plus, Edit2, Copy, Trash2, Eye, Search, FileText, Monitor, Zap, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import DBELogo from '../components/DBELogo';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { presentations, deletePresentation, duplicatePresentation, isLoading } = useStorage();
+  const { presentations, deletePresentation, duplicatePresentation, isLoading, syncError, refresh } = useStorage();
   const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -37,13 +37,24 @@ const Dashboard: React.FC = () => {
         <div>
           <DBELogo className="h-16 mb-4" />
           <div className="flex items-center gap-3">
-            <p className="text-zinc-400">Gerencie seus roteiros profissionais.</p>
-            {isLoading && (
-              <span className="flex items-center gap-2 text-xs text-dbe-blue font-bold animate-pulse">
-                <div className="w-2 h-2 bg-dbe-blue rounded-full"></div>
-                Sincronizando com a nuvem...
-              </span>
-            )}
+            <p className="text-zinc-400 text-sm">Gerencie seus roteiros profissionais.</p>
+            <div className="flex items-center gap-2">
+              {isLoading && (
+                <span className="flex items-center gap-1.5 text-xs text-dbe-blue font-bold animate-pulse">
+                  <div className="w-2 h-2 bg-dbe-blue rounded-full"></div>
+                  Sincronizando...
+                </span>
+              )}
+              {!isLoading && (
+                <button
+                  onClick={() => refresh()}
+                  className="p-1.5 rounded-lg text-zinc-500 hover:text-dbe-blue hover:bg-dbe-blue/10 transition-all"
+                  title="Forçar sincronização com a nuvem"
+                >
+                  <RefreshCw size={14} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -66,6 +77,22 @@ const Dashboard: React.FC = () => {
         </div>
       </header>
 
+      {syncError && (
+        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold text-red-400 uppercase tracking-wider">Erro de sincronização</p>
+            <p className="text-xs text-zinc-400 mt-0.5 truncate max-w-xs">{syncError}</p>
+          </div>
+          <button 
+            onClick={() => refresh()} 
+            className="flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-white bg-red-500/20 hover:bg-red-500/40 px-3 py-1.5 rounded-lg transition-all shrink-0"
+          >
+            <RefreshCw size={12} />
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
       <div className="mb-8 relative">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={20} />
         <input 
@@ -77,15 +104,26 @@ const Dashboard: React.FC = () => {
         />
       </div>
 
-      {isLoading && filtered.length === 0 ? (
+      {isLoading && presentations.length === 0 ? (
         <div className="text-center py-20 card bg-zinc-900/50">
           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-dbe-blue mx-auto mb-4"></div>
           <p className="text-zinc-400 text-lg">Carregando apresentações da nuvem...</p>
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-20 card bg-zinc-900/50">
-          <FileText size={48} className="mx-auto mb-4 text-zinc-700" />
-          <p className="text-zinc-500 text-lg">Nenhuma apresentação encontrada.</p>
+      ) : !isLoading && filtered.length === 0 ? (
+        <div className="text-center py-20 card bg-zinc-900/50 space-y-4">
+          <FileText size={48} className="mx-auto text-zinc-700" />
+          {presentations.length === 0 ? (
+            <>
+              <p className="text-zinc-400 text-lg font-semibold">Nenhuma apresentação na nuvem</p>
+              <p className="text-zinc-600 text-sm">Crie sua primeira apresentação ou verifique a conexão com a nuvem.</p>
+              <button onClick={() => refresh()} className="btn-secondary mx-auto">
+                <RefreshCw size={16} />
+                Sincronizar Novamente
+              </button>
+            </>
+          ) : (
+            <p className="text-zinc-500 text-lg">Nenhuma apresentação encontrada para "{searchTerm}".</p>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -97,54 +135,55 @@ const Dashboard: React.FC = () => {
               transition={{ delay: index * 0.05 }}
               className="card group"
             >
-              <div className="p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <span className="text-xs font-bold uppercase tracking-wider text-dbe-green mb-1 block">
-                      {presentation.clientSegment || 'Geral'}
-                    </span>
-                    <h3 className="text-xl font-bold text-white group-hover:text-dbe-blue transition-colors">
-                      {presentation.clientName}
-                    </h3>
-                  </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={() => navigate(`/teleprompter/${presentation.id}`)} 
-                      className="btn-ghost p-2"
-                      title="Abrir no Teleprompter"
-                    >
-                      <Monitor size={18} />
-                    </button>
-                    <button 
-                      onClick={() => navigate(`/visualizar/${presentation.id}`)} 
-                      className="btn-ghost p-2 text-dbe-blue"
-                      title="Visualizar"
-                    >
-                      <Eye size={18} />
-                    </button>
-                    <button 
-                      onClick={() => handleDuplicate(presentation.id)}
-                      className="btn-ghost" 
-                      title="Duplicar"
-                    >
-                      <Copy size={16} />
-                    </button>
-                    <button 
-                      onClick={() => handleDelete(presentation.id, presentation.clientName)}
-                      className="btn-ghost hover:text-red-400" 
-                      title="Excluir"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+              <div className="p-5">
+                <div className="mb-4">
+                  <span className="text-xs font-bold uppercase tracking-wider text-dbe-green mb-1 block">
+                    {presentation.clientSegment || 'Geral'}
+                  </span>
+                  <h3 className="text-lg font-bold text-white group-hover:text-dbe-blue transition-colors leading-tight">
+                    {presentation.clientName}
+                  </h3>
+                  <p className="text-zinc-400 text-sm mt-1 line-clamp-2">
+                    {presentation.title}
+                  </p>
+                </div>
+
+                {/* Action buttons - always visible */}
+                <div className="flex items-center gap-1 mb-4">
+                  <button 
+                    onClick={() => navigate(`/teleprompter/${presentation.id}`)} 
+                    className="btn-ghost p-2 rounded-lg border border-zinc-800 flex-1 flex items-center justify-center gap-1 text-xs"
+                    title="Abrir no Teleprompter"
+                  >
+                    <Monitor size={14} />
+                    <span className="hidden sm:inline">Prompter</span>
+                  </button>
+                  <button 
+                    onClick={() => navigate(`/visualizar/${presentation.id}`)} 
+                    className="btn-ghost p-2 rounded-lg border border-zinc-800 flex-1 flex items-center justify-center gap-1 text-xs text-dbe-blue"
+                    title="Visualizar"
+                  >
+                    <Eye size={14} />
+                    <span className="hidden sm:inline">Ver</span>
+                  </button>
+                  <button 
+                    onClick={() => handleDuplicate(presentation.id)}
+                    className="btn-ghost p-2 rounded-lg border border-zinc-800 flex-1 flex items-center justify-center gap-1 text-xs" 
+                    title="Duplicar"
+                  >
+                    <Copy size={14} />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(presentation.id, presentation.clientName)}
+                    className="btn-ghost p-2 rounded-lg border border-zinc-800 flex-1 flex items-center justify-center gap-1 text-xs hover:text-red-400 hover:border-red-400/30" 
+                    title="Excluir"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
                 
-                <p className="text-zinc-400 text-sm mb-6 line-clamp-2">
-                  {presentation.title}
-                </p>
-
-                <div className="flex items-center justify-between mt-auto">
-                  <span className="text-xs text-zinc-500">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-zinc-600">
                     {new Date(presentation.createdAt).toLocaleDateString('pt-BR')}
                   </span>
                   <div className="flex gap-2">
@@ -152,14 +191,14 @@ const Dashboard: React.FC = () => {
                       onClick={() => navigate(`/visualizar/${presentation.id}`)}
                       className="btn-secondary py-1.5 px-3 text-xs"
                     >
-                      <Eye size={14} />
+                      <Eye size={13} />
                       Visualizar
                     </button>
                     <button 
                       onClick={() => navigate(`/editar/${presentation.id}`)}
                       className="btn-primary py-1.5 px-3 text-xs"
                     >
-                      <Edit2 size={14} />
+                      <Edit2 size={13} />
                       Editar
                     </button>
                   </div>
