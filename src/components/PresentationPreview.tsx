@@ -110,7 +110,6 @@ const PresentationPreview: React.FC<PreviewProps> = ({ data, isPrint = false }) 
                     <span className="font-medium">{script.tone || '—'}</span>
                   </div>
                 </div>
-              </header>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                 <div className="space-y-8">
