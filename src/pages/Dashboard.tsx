@@ -8,7 +8,7 @@ import DBELogo from '../components/DBELogo';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { presentations, deletePresentation, duplicatePresentation, isLoading, syncError, refresh } = useStorage();
+  const { presentations, deletePresentation, duplicatePresentation, isLoading, syncError, refresh, manualRefresh } = useStorage();
   const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -47,7 +47,7 @@ const Dashboard: React.FC = () => {
               )}
               {!isLoading && (
                 <button
-                  onClick={() => refresh()}
+                  onClick={() => manualRefresh()}
                   className="p-1.5 rounded-lg text-zinc-500 hover:text-dbe-blue hover:bg-dbe-blue/10 transition-all"
                   title="Forçar sincronização com a nuvem"
                 >
@@ -84,7 +84,7 @@ const Dashboard: React.FC = () => {
             <p className="text-xs text-zinc-400 mt-0.5 truncate max-w-xs">{syncError}</p>
           </div>
           <button 
-            onClick={() => refresh()} 
+            onClick={() => manualRefresh()} 
             className="flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-white bg-red-500/20 hover:bg-red-500/40 px-3 py-1.5 rounded-lg transition-all shrink-0"
           >
             <RefreshCw size={12} />

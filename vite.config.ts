@@ -38,16 +38,27 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
+        // Pass ALL external requests (especially Google Apps Script / JSONP) straight to network
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\//i,
-            handler: 'NetworkFirst',
+            // Google Apps Script — MUST be NetworkOnly to allow JSONP to work
+            urlPattern: /^https:\/\/script\.google\.com\/.*/i,
+            handler: 'NetworkOnly',
+          },
+          {
+            // Google Fonts
+            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
+            handler: 'CacheFirst',
             options: {
-              cacheName: 'external-cache',
+              cacheName: 'google-fonts-cache',
               expiration: {
-                maxEntries: 32,
-                maxAgeSeconds: 24 * 60 * 60 // 24h
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 365
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
               }
             }
           }

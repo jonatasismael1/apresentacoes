@@ -13,10 +13,10 @@ const fetchJsonp = <T,>(url: string): Promise<T> => {
     const separator = url.includes('?') ? '&' : '?';
     script.src = `${url}${separator}callback=${callbackName}&_=${Date.now()}`;
     script.async = true;
+    script.crossOrigin = 'anonymous';
 
     const cleanup = () => {
       delete (window as any)[callbackName];
-
       if (script.parentNode) {
         script.parentNode.removeChild(script);
       }
@@ -24,8 +24,8 @@ const fetchJsonp = <T,>(url: string): Promise<T> => {
 
     const timeout = setTimeout(() => {
       cleanup();
-      reject(new Error('Timeout ao carregar dados da nuvem via JSONP'));
-    }, 10000);
+      reject(new Error('Tempo de resposta esgotado. Verifique sua conexão e tente novamente.'));
+    }, 15000);
 
     (window as any)[callbackName] = (data: T) => {
       clearTimeout(timeout);
@@ -36,7 +36,7 @@ const fetchJsonp = <T,>(url: string): Promise<T> => {
     script.onerror = () => {
       clearTimeout(timeout);
       cleanup();
-      reject(new Error('Erro ao carregar JSONP'));
+      reject(new Error('Não foi possível conectar à nuvem. O app funcionará offline.'));
     };
 
     document.body.appendChild(script);
@@ -87,9 +87,9 @@ export const useStorage = () => {
   };
 
   // Função para carregar da nuvem via JSONP (Bypasses CORS)
-  const fetchFromCloud = useCallback(async () => {
+  const fetchFromCloud = useCallback(async (isManual = false) => {
     setIsLoading(true);
-    setSyncError(null);
+    if (isManual) setSyncError(null);
 
     try {
       console.log('[Cloud Sync] Buscando dados da nuvem via JSONP...');
@@ -102,6 +102,7 @@ export const useStorage = () => {
         setPresentations(cloudData);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
         localStorage.removeItem(EXAMPLE_FLAG); // Mark as real data
+        setSyncError(null); // Clear any previous error on success
         return;
       }
 
@@ -113,7 +114,7 @@ export const useStorage = () => {
       if (cloudData && (cloudData as any).status === 'error') {
         const msg = (cloudData as any).message || 'Erro desconhecido';
         console.error('[Cloud Sync] Erro retornado pelo Apps Script:', msg);
-        setSyncError(msg);
+        if (isManual) setSyncError(msg);
         return;
       }
 
@@ -122,11 +123,13 @@ export const useStorage = () => {
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Falha de conexão';
       console.error('[Cloud Sync] Erro ao carregar dados via JSONP:', msg);
-      setSyncError(msg);
+      // Only show error to user if they triggered it manually
+      if (isManual) setSyncError(msg);
     } finally {
       setIsLoading(false);
     }
   }, []);
+
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -213,7 +216,8 @@ export const useStorage = () => {
     deletePresentation,
     duplicatePresentation,
     getPresentation,
-    refresh: fetchFromCloud
+    refresh: fetchFromCloud,
+    manualRefresh: () => fetchFromCloud(true),
   };
 };
 
