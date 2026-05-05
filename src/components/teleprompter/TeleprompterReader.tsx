@@ -205,6 +205,15 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
           className="whitespace-pre-wrap font-sans"
         >
           {text}
+          
+          <div className="mt-32 pb-[50vh] flex justify-center w-full">
+            <button 
+              onClick={onExit}
+              className="px-8 py-4 bg-zinc-900 border border-zinc-800 text-zinc-500 rounded-full text-sm font-bold uppercase tracking-widest hover:bg-zinc-800 hover:text-white transition-all shadow-xl shadow-black/50"
+            >
+              Fim — Voltar ao Menu
+            </button>
+          </div>
         </div>
       </div>
 

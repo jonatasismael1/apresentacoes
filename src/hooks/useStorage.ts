@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Presentation } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import { addToQueue, getQueue, removeFromQueue } from '../lib/syncQueue';
 
 const STORAGE_KEY = 'dbe_apresentacoes';
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbzTt15VdiCcqn9kYwQkl4oc2jQ5UL8uYJZ1k2ToMNRby4F-TJ7C7zLYKVc4HA2hI2YG/exec';
@@ -50,27 +51,75 @@ export const useStorage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
 
-  // Função utilitária para envio via fetch no-cors com FormData
-  const submitToGoogleScript = async (payload: unknown) => {
-    console.log('[Cloud Sync] Enviando payload via fetch no-cors:', payload);
+  const submitToGoogleScript = async (payload: unknown, type: 'save' | 'delete' = 'save') => {
+    if (!navigator.onLine) {
+      console.log('[Cloud Sync] Offline. Adicionando à fila.');
+      await addToQueue(type, payload);
+      return;
+    }
 
-    const formData = new FormData();
-    formData.append('payload', JSON.stringify(payload));
+    try {
+      console.log('[Cloud Sync] Enviando payload via fetch no-cors:', payload);
+      const formData = new FormData();
+      formData.append('payload', JSON.stringify(payload));
 
-    await fetch(CLOUD_API_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: formData,
-    });
-
-    console.log('[Cloud Sync] POST no-cors enviado para Apps Script.');
+      await fetch(CLOUD_API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: formData,
+      });
+      console.log('[Cloud Sync] POST no-cors enviado para Apps Script.');
+    } catch (error) {
+      console.error('[Cloud Sync] Erro no fetch, adicionando à fila:', error);
+      await addToQueue(type, payload);
+    }
   };
+
+  const processQueue = useCallback(async () => {
+    if (!navigator.onLine) return;
+    
+    const queue = await getQueue();
+    if (queue.length === 0) return;
+
+    console.log(`[Sync Queue] Processando ${queue.length} itens pendentes...`);
+    for (const item of queue) {
+      try {
+        const formData = new FormData();
+        formData.append('payload', JSON.stringify(item.payload));
+        
+        await fetch(CLOUD_API_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: formData,
+        });
+        
+        await removeFromQueue(item.id);
+        console.log(`[Sync Queue] Item ${item.id} enviado com sucesso!`);
+      } catch (e) {
+        console.error(`[Sync Queue] Falha ao enviar item ${item.id}. Tentará de novo depois.`, e);
+      }
+    }
+  }, []);
+
+  // Ouve eventos de volta à rede para processar a fila
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('[Network] Voltou a ficar online. Processando fila...');
+      processQueue();
+    };
+
+    window.addEventListener('online', handleOnline);
+    // Tenta processar na inicialização
+    processQueue();
+
+    return () => window.removeEventListener('online', handleOnline);
+  }, [processQueue]);
 
   // Função para salvar na nuvem (Sheets)
   const saveToCloud = async (presentation: Presentation) => {
     try {
       console.log('[Cloud Sync] Enviando apresentação para Google Sheets');
-      await submitToGoogleScript(presentation);
+      await submitToGoogleScript(presentation, 'save');
     } catch (error) {
       console.error('[Cloud Sync] Erro ao enviar apresentação:', error);
     }
@@ -80,7 +129,7 @@ export const useStorage = () => {
   const deleteFromCloud = async (id: string) => {
     try {
       console.log('[Cloud Sync] Enviando exclusão para Google Sheets');
-      await submitToGoogleScript({ action: 'delete', id });
+      await submitToGoogleScript({ action: 'delete', id }, 'delete');
     } catch (error) {
       console.error('[Cloud Sync] Erro ao excluir apresentação:', error);
     }
