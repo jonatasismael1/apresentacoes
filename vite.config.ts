@@ -6,7 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   plugins: [
     react(),
-    VitePWA({
+    /* VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'logo-dbe.png'],
       manifest: {
@@ -29,6 +29,6 @@ export default defineConfig({
           }
         ]
       }
-    })
+    }) */
   ],
 })

@@ -8,7 +8,7 @@ import DBELogo from '../components/DBELogo';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { presentations, deletePresentation, duplicatePresentation } = useStorage();
+  const { presentations, deletePresentation, duplicatePresentation, isLoading } = useStorage();
   const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -36,7 +36,15 @@ const Dashboard: React.FC = () => {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
         <div>
           <DBELogo className="h-16 mb-4" />
-          <p className="text-zinc-400">Gerencie seus roteiros profissionais.</p>
+          <div className="flex items-center gap-3">
+            <p className="text-zinc-400">Gerencie seus roteiros profissionais.</p>
+            {isLoading && (
+              <span className="flex items-center gap-2 text-xs text-dbe-blue font-bold animate-pulse">
+                <div className="w-2 h-2 bg-dbe-blue rounded-full"></div>
+                Sincronizando com a nuvem...
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex gap-3">
           <button onClick={() => navigate('/teleprompter')} className="btn-secondary hidden sm:flex">
@@ -64,7 +72,12 @@ const Dashboard: React.FC = () => {
         />
       </div>
 
-      {filtered.length === 0 ? (
+      {isLoading && filtered.length === 0 ? (
+        <div className="text-center py-20 card bg-zinc-900/50">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-dbe-blue mx-auto mb-4"></div>
+          <p className="text-zinc-400 text-lg">Carregando apresentações da nuvem...</p>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-20 card bg-zinc-900/50">
           <FileText size={48} className="mx-auto mb-4 text-zinc-700" />
           <p className="text-zinc-500 text-lg">Nenhuma apresentação encontrada.</p>

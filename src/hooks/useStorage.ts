@@ -10,7 +10,8 @@ const fetchJsonp = <T,>(url: string): Promise<T> => {
     const callbackName = `jsonp_callback_${Date.now()}_${Math.round(Math.random() * 100000)}`;
 
     const script = document.createElement('script');
-    script.src = `${url}?callback=${callbackName}`;
+    const separator = url.includes('?') ? '&' : '?';
+    script.src = `${url}${separator}callback=${callbackName}&_=${Date.now()}`;
     script.async = true;
 
     const cleanup = () => {
