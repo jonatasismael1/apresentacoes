@@ -46,14 +46,15 @@ const Dashboard: React.FC = () => {
             )}
           </div>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <button onClick={() => navigate('/teleprompter-rapido')} className="btn-secondary hidden sm:flex border border-dbe-blue/30 text-dbe-blue hover:bg-dbe-blue/10">
-            <Zap size={18} fill="currentColor" />
-            Teleprompter Rápido
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => navigate('/teleprompter-rapido')} className="btn-secondary flex border border-dbe-blue/30 text-dbe-blue hover:bg-dbe-blue/10 text-sm px-3 py-2">
+            <Zap size={16} fill="currentColor" />
+            <span className="hidden sm:inline">Teleprompter Rápido</span>
+            <span className="sm:hidden">Rápido</span>
           </button>
-          <button onClick={() => navigate('/teleprompter')} className="btn-secondary hidden sm:flex">
-            <Monitor size={18} />
-            Teleprompter
+          <button onClick={() => navigate('/teleprompter')} className="btn-secondary flex text-sm px-3 py-2">
+            <Monitor size={16} />
+            <span className="hidden sm:inline">Teleprompter</span>
           </button>
           <button 
             onClick={() => navigate('/novo')}
