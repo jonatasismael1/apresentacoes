@@ -45,26 +45,48 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
     return () => cancelAnimationFrame(requestRef.current);
   }, [animate, isPlaying]);
 
+  // Ref estável para o estado de reprodução (evita recriar callbacks)
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
   // ─── Handlers para o controle Bluetooth ─────────────────────────────────────
-  // ArrowUp / PageUp → sobe o texto (recua o scrollPos)
+  // ↑ (ArrowUp / PageUp) → SEMPRE sobe o texto (recua a posição)
   const handleScrollUp = useCallback(() => {
-    setScrollPos(prev => Math.max(0, prev - 120));
+    setScrollPos(prev => Math.max(0, prev - 150));
   }, []);
 
-  // ArrowDown / PageDown → desce o texto (avança o scrollPos)
+  // ↓ (ArrowDown / PageDown) → SEMPRE desce o texto (avança a posição)
   const handleScrollDown = useCallback(() => {
-    setScrollPos(prev => prev + 120);
+    setScrollPos(prev => prev + 150);
   }, []);
 
-  // ArrowLeft → diminui velocidade
-  const handleSpeedDec = useCallback(() => {
-    updateSettings({ speed: Math.max(0.1, settings.speed - 0.5) });
-  }, [settings.speed, updateSettings]);
+  // ← (ArrowLeft) → comportamento depende do estado:
+  //   PAUSADO  → sobe o texto (recua)
+  //   PLAYING  → diminui velocidade
+  const handleLeft = useCallback(() => {
+    if (isPlayingRef.current) {
+      // Diminui velocidade
+      updateSettings({ speed: Math.max(0.1, settingsRef.current.speed - 0.5) });
+    } else {
+      // Sobe o texto (volta)
+      setScrollPos(prev => Math.max(0, prev - 150));
+    }
+  }, [updateSettings]);
 
-  // ArrowRight → aumenta velocidade
-  const handleSpeedInc = useCallback(() => {
-    updateSettings({ speed: Math.min(10, settings.speed + 0.5) });
-  }, [settings.speed, updateSettings]);
+  // → (ArrowRight) → comportamento depende do estado:
+  //   PAUSADO  → desce o texto (avança)
+  //   PLAYING  → aumenta velocidade
+  const handleRight = useCallback(() => {
+    if (isPlayingRef.current) {
+      // Aumenta velocidade
+      updateSettings({ speed: Math.min(10, settingsRef.current.speed + 0.5) });
+    } else {
+      // Desce o texto (avança)
+      setScrollPos(prev => prev + 150);
+    }
+  }, [updateSettings]);
 
   // Enter / Space / MediaPlayPause → play/pause
   const handleTogglePlay = useCallback(() => {
@@ -76,14 +98,16 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
     setDebugLog(prev => [info, ...prev].slice(0, 10));
   }, []);
 
-  // Integra o hook de teclas — funciona para controle Bluetooth em modo HID
+  // Integra o hook de teclas — controle Bluetooth em modo HID
+  // NOTA: ↑/↓ físicos do Ulanzi enviam VolumeUp/Down (SO intercepta no mobile).
+  // Por isso mapeamos ←/→ contextualmente: pausado=scroll, rodando=velocidade.
   useTeleprompterKeys({
-    active: true, // sempre ativo enquanto TeleprompterReader está montado
+    active: true,
     containerRef,
     onScrollUp:        handleScrollUp,
     onScrollDown:      handleScrollDown,
-    onSpeedDecrease:   handleSpeedDec,
-    onSpeedIncrease:   handleSpeedInc,
+    onSpeedDecrease:   handleLeft,
+    onSpeedIncrease:   handleRight,
     onTogglePlayPause: handleTogglePlay,
     onKeyDebug:        handleKeyDebug,
   });
@@ -319,8 +343,8 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
                 {[
                   { label: '↑ Subir',      keys: 'ArrowUp / PageUp' },
                   { label: '↓ Descer',     keys: 'ArrowDown / PageDown' },
-                  { label: '← Vel-',       keys: 'ArrowLeft' },
-                  { label: '→ Vel+',       keys: 'ArrowRight' },
+                  { label: '← Voltar/Vel-',keys: 'ArrowLeft' },
+                  { label: '→ Avançar/Vel+',keys: 'ArrowRight' },
                   { label: '⏯ Play/Pause', keys: 'Enter / Space' },
                 ].map(m => (
                   <div key={m.label} className="flex justify-between">
@@ -355,9 +379,9 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
               <div className="w-[1px] h-6 sm:h-8 bg-zinc-800 mx-0.5" />
 
               <button 
-                onClick={handleSpeedDec}
+                onClick={handleLeft}
                 className="p-2 sm:p-3 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
-                title="Diminuir velocidade (←)"
+                title="Voltar / Diminuir velocidade (←)"
               >
                 <Minus size={18} />
               </button>
@@ -370,9 +394,9 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
               </button>
 
               <button 
-                onClick={handleSpeedInc}
+                onClick={handleRight}
                 className="p-2 sm:p-3 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
-                title="Aumentar velocidade (→)"
+                title="Avançar / Aumentar velocidade (→)"
               >
                 <Plus size={18} />
               </button>
