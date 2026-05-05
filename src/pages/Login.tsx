@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle } from 'lucide-react';
 import { login } from '../lib/auth';
-import DBELogo from '../components/DBELogo';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -29,7 +28,7 @@ export function Login() {
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-dbe-blue via-blue-400 to-emerald-400" />
 
         <div className="flex justify-center mb-8">
-          <DBELogo className="h-16" />
+          <img src="/pwa-512x512.png" alt="DBE Logo" className="h-20 w-auto object-contain" />
         </div>
         <p className="text-zinc-400 text-center mb-8 text-sm">
           Acesso restrito. Insira suas credenciais.
