@@ -3,100 +3,79 @@ import { useEffect, useCallback, useRef } from 'react';
 // ─────────────────────────────────────────────────────────────────────────────
 // SOBRE CONTROLES BLUETOOTH EM MOBILE (Android/iOS)
 // ─────────────────────────────────────────────────────────────────────────────
-// ⚠️  IMPORTANTE: Teclas de Volume (VolumeUp/Down) e Media (MediaTrackNext/
-// Previous, MediaPlayPause) são interceptadas pelo SISTEMA OPERACIONAL antes
-// de chegar ao browser. É uma limitação do Android/iOS — não é possível
-// capturá-las nem com preventDefault().
+// Muitos controles Bluetooth (como Ulanzi) atuam de duas formas no celular:
+// 1. HID Keyboard: enviam teclas como ArrowUp, PageDown, etc.
+// 2. Gamepad: se conectam como um controle de jogo (joystick).
 //
-// Teclas que SIM chegam ao browser mobile:
-//   - ArrowUp / ArrowDown / ArrowLeft / ArrowRight
-//   - PageUp / PageDown
-//   - Enter / Space
-//   - F5, F8 (alguns modelos)
-//
-// O Ulanzi em modo "Page" envia PageUp/PageDown (use este modo se disponível).
-// O Ulanzi em modo "Arrow" envia ArrowUp/ArrowDown.
-// O botão central tipicamente envia Enter ou Space.
+// O Android/iOS muitas vezes INTERCEPTA teclas de volume e mídia, impedindo
+// que cheguem ao navegador como eventos de teclado.
+// Por isso, combinamos Keyboard Events + Gamepad API para garantir que
+// qualquer clique chegue ao app, independentemente do modo do controle.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const KEY_MAP = {
-  scrollUp: [
+  actionBackward: [
     'ArrowUp',
+    'ArrowLeft',
     'PageUp',
-    // Volume keys: NÃO funcionam em mobile (interceptadas pelo SO)
-    // Deixadas aqui para desktop/PWA instalado como app
+    // Fallbacks para Desktop:
     'AudioVolumeUp',
     'VolumeUp',
+    'MediaTrackPrevious'
   ],
-  scrollDown: [
+  actionForward: [
     'ArrowDown',
+    'ArrowRight',
     'PageDown',
+    // Fallbacks para Desktop:
     'AudioVolumeDown',
     'VolumeDown',
-  ],
-  speedDecrease: [
-    'ArrowLeft',
-    'MediaTrackPrevious',
-  ],
-  speedIncrease: [
-    'ArrowRight',
-    'MediaTrackNext',
+    'MediaTrackNext'
   ],
   togglePlayPause: [
     'Enter',
     ' ',               // Space
     'MediaPlayPause',
     'MediaPlay',
-    'MediaPause',
-    'MediaStop',
     'F5',
     'F8',
     'AudioPlay',
   ],
 } as const;
 
-// KeyCodes numéricos — fallback para dispositivos que deixam event.key vazio
-// Funciona em browsers desktop e em PWA instalado
 export const KEYCODE_MAP: Record<number, keyof typeof KEY_MAP> = {
-  38: 'scrollUp',       // ArrowUp
-  33: 'scrollUp',       // PageUp
-  175: 'scrollUp',      // VolumeUp (Windows/desktop)
-  40: 'scrollDown',     // ArrowDown
-  34: 'scrollDown',     // PageDown
-  174: 'scrollDown',    // VolumeDown (Windows/desktop)
-  37: 'speedDecrease',  // ArrowLeft
-  39: 'speedIncrease',  // ArrowRight
-  13: 'togglePlayPause', // Enter
-  32: 'togglePlayPause', // Space
-  179: 'togglePlayPause', // MediaPlayPause (Windows)
-  116: 'togglePlayPause', // F5
-  119: 'togglePlayPause', // F8
+  38: 'actionBackward', // ArrowUp
+  37: 'actionBackward', // ArrowLeft
+  33: 'actionBackward', // PageUp
+  175: 'actionBackward', // VolumeUp
+  40: 'actionForward',  // ArrowDown
+  39: 'actionForward',  // ArrowRight
+  34: 'actionForward',  // PageDown
+  174: 'actionForward', // VolumeDown
+  13: 'togglePlayPause',// Enter
+  32: 'togglePlayPause',// Space
+  179: 'togglePlayPause',// MediaPlayPause
 };
 
 export type TeleprompterAction = keyof typeof KEY_MAP;
 
 export interface UseTeleprompterKeysOptions {
-  /** O teleprompter está ativo? Atalhos só atuam quando true. */
   active: boolean;
-  onScrollUp?: () => void;
-  onScrollDown?: () => void;
-  onSpeedDecrease?: () => void;
-  onSpeedIncrease?: () => void;
+  onActionBackward?: () => void;
+  onActionForward?: () => void;
   onTogglePlayPause?: () => void;
-  /** Callback para o painel de debug */
   onKeyDebug?: (info: KeyDebugInfo) => void;
-  /** Container que deve receber foco para capturar eventos de teclado */
   containerRef?: React.RefObject<HTMLElement | null>;
 }
 
 export interface KeyDebugInfo {
   key: string;
   code: string;
-  keyCode: number;
-  type: 'keydown' | 'keyup';
+  keyCode: number | string; // string for gamepad buttons
+  type: 'keydown' | 'keyup' | 'gamepad';
   action: TeleprompterAction | null;
   timestamp: number;
-  source: 'key' | 'keycode';
+  source: 'key' | 'keycode' | 'gamepad';
 }
 
 function isTypingTarget(el: EventTarget | null): boolean {
@@ -117,35 +96,36 @@ function resolveActionByKey(key: string): TeleprompterAction | null {
   return null;
 }
 
-function resolveActionByKeyCode(keyCode: number): TeleprompterAction | null {
-  return KEYCODE_MAP[keyCode] ?? null;
-}
-
 export function useTeleprompterKeys(options: UseTeleprompterKeysOptions) {
   const {
     active,
-    onScrollUp,
-    onScrollDown,
-    onSpeedDecrease,
-    onSpeedIncrease,
+    onActionBackward,
+    onActionForward,
     onTogglePlayPause,
     onKeyDebug,
     containerRef,
   } = options;
 
   const cbRef = useRef({
-    onScrollUp,
-    onScrollDown,
-    onSpeedDecrease,
-    onSpeedIncrease,
+    onActionBackward,
+    onActionForward,
     onTogglePlayPause,
     onKeyDebug,
   });
-  cbRef.current = { onScrollUp, onScrollDown, onSpeedDecrease, onSpeedIncrease, onTogglePlayPause, onKeyDebug };
+  cbRef.current = { onActionBackward, onActionForward, onTogglePlayPause, onKeyDebug };
 
   const activeRef = useRef(active);
   activeRef.current = active;
 
+  const triggerAction = useCallback((action: TeleprompterAction) => {
+    switch (action) {
+      case 'actionBackward':   cbRef.current.onActionBackward?.();   break;
+      case 'actionForward':    cbRef.current.onActionForward?.();    break;
+      case 'togglePlayPause':  cbRef.current.onTogglePlayPause?.();  break;
+    }
+  }, []);
+
+  // ─── 1. Keyboard API ────────────────────────────────────────────────────────
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (!activeRef.current) return;
     if (isTypingTarget(e.target)) return;
@@ -154,7 +134,7 @@ export function useTeleprompterKeys(options: UseTeleprompterKeysOptions) {
     let source: KeyDebugInfo['source'] = 'key';
 
     if (!action && e.keyCode) {
-      action = resolveActionByKeyCode(e.keyCode);
+      action = KEYCODE_MAP[e.keyCode] ?? null;
       if (action) source = 'keycode';
     }
 
@@ -170,59 +150,24 @@ export function useTeleprompterKeys(options: UseTeleprompterKeysOptions) {
 
     if (!action) return;
 
-    // Bloqueia comportamentos padrão (scroll de página, etc.)
-    // Nota: NÃO bloqueia Volume/Media no mobile — SO os intercepta antes
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
 
-    switch (action) {
-      case 'scrollUp':        cbRef.current.onScrollUp?.();        break;
-      case 'scrollDown':      cbRef.current.onScrollDown?.();      break;
-      case 'speedDecrease':   cbRef.current.onSpeedDecrease?.();   break;
-      case 'speedIncrease':   cbRef.current.onSpeedIncrease?.();   break;
-      case 'togglePlayPause': cbRef.current.onTogglePlayPause?.(); break;
-    }
-  }, []);
+    triggerAction(action);
+  }, [triggerAction]);
 
-  const handleKeyUp = useCallback((e: KeyboardEvent) => {
-    if (!activeRef.current) return;
-    if (isTypingTarget(e.target)) return;
-
-    let action = resolveActionByKey(e.key);
-    let source: KeyDebugInfo['source'] = 'key';
-    if (!action && e.keyCode) {
-      action = resolveActionByKeyCode(e.keyCode);
-      if (action) source = 'keycode';
-    }
-
-    cbRef.current.onKeyDebug?.({
-      key: e.key || '(vazio)',
-      code: e.code || '(vazio)',
-      keyCode: e.keyCode,
-      type: 'keyup',
-      action,
-      timestamp: Date.now(),
-      source,
-    });
-  }, []);
-
-  // Registra em window e document com capture:true
   useEffect(() => {
     const opts = { capture: true, passive: false } as AddEventListenerOptions;
     window.addEventListener('keydown', handleKeyDown, opts);
-    window.addEventListener('keyup',   handleKeyUp,   opts);
     document.addEventListener('keydown', handleKeyDown, opts);
-    document.addEventListener('keyup',   handleKeyUp,   opts);
     return () => {
       window.removeEventListener('keydown', handleKeyDown, opts);
-      window.removeEventListener('keyup',   handleKeyUp,   opts);
       document.removeEventListener('keydown', handleKeyDown, opts);
-      document.removeEventListener('keyup',   handleKeyUp,   opts);
     };
-  }, [handleKeyDown, handleKeyUp]);
+  }, [handleKeyDown]);
 
-  // Foca o container quando ativo para garantir recebimento dos eventos
+  // Foco inicial garantido
   useEffect(() => {
     if (!active) return;
     const el = containerRef?.current;
@@ -231,4 +176,90 @@ export function useTeleprompterKeys(options: UseTeleprompterKeysOptions) {
       return () => clearTimeout(tid);
     }
   }, [active, containerRef]);
+
+  // ─── 2. Gamepad API (Fallback Poderoso) ─────────────────────────────────────
+  useEffect(() => {
+    if (!active) return;
+    let animationFrameId: number;
+    // Armazena o estado anterior de cada botão para disparar apenas no momento do "press"
+    const prevButtonStates = new Map<string, boolean | string>();
+
+    const pollGamepads = () => {
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (const gp of gamepads) {
+        if (!gp) continue;
+        
+        gp.buttons.forEach((btn, index) => {
+          const isPressed = btn.pressed;
+          const key = `${gp.index}-${index}`;
+          const wasPressed = prevButtonStates.get(key) || false;
+
+          if (isPressed && !wasPressed) {
+            // Um botão foi pressionado!
+            let action: TeleprompterAction | null = null;
+            
+            // Mapeamento genérico de botões de Gamepad
+            // 0, 1, 2, 3 = A, B, X, Y
+            // 12 = UP, 13 = DOWN, 14 = LEFT, 15 = RIGHT
+            // 4, 5 = L1, R1
+            // 9 = Start
+            if ([12, 14, 4].includes(index)) action = 'actionBackward'; // Up, Left, L1
+            if ([13, 15, 5].includes(index)) action = 'actionForward';  // Down, Right, R1
+            if ([0, 1, 2, 3, 9].includes(index)) action = 'togglePlayPause'; // A,B,X,Y,Start
+
+            cbRef.current.onKeyDebug?.({
+              key: `Botão ${index}`,
+              code: `Gamepad ${gp.index}`,
+              keyCode: index,
+              type: 'gamepad',
+              action,
+              timestamp: Date.now(),
+              source: 'gamepad',
+            });
+
+            if (action) {
+              triggerAction(action);
+            }
+          }
+          prevButtonStates.set(key, isPressed);
+        });
+
+        // Eixos (Analógico)
+        gp.axes.forEach((axisValue, index) => {
+          const isPushed = Math.abs(axisValue) > 0.5;
+          const direction = axisValue < -0.5 ? 'neg' : (axisValue > 0.5 ? 'pos' : 'center');
+          const key = `axis-${gp.index}-${index}`;
+          const prevDir = prevButtonStates.get(key) || 'center';
+
+          if (isPushed && prevDir === 'center') {
+            let action: TeleprompterAction | null = null;
+            // Axis 0 = Esquerda/Direita, Axis 1 = Cima/Baixo
+            if (index === 0) {
+              action = direction === 'neg' ? 'actionBackward' : 'actionForward';
+            } else if (index === 1) {
+              action = direction === 'neg' ? 'actionBackward' : 'actionForward';
+            }
+
+            if (action) {
+              cbRef.current.onKeyDebug?.({
+                key: `Eixo ${index} ${direction}`,
+                code: `Gamepad ${gp.index}`,
+                keyCode: `axis${index}`,
+                type: 'gamepad',
+                action,
+                timestamp: Date.now(),
+                source: 'gamepad',
+              });
+              triggerAction(action);
+            }
+          }
+          prevButtonStates.set(key, isPushed ? direction : 'center');
+        });
+      }
+      animationFrameId = requestAnimationFrame(pollGamepads);
+    };
+
+    animationFrameId = requestAnimationFrame(pollGamepads);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [active, triggerAction]);
 }

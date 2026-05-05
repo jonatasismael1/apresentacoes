@@ -52,15 +52,9 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
   settingsRef.current = settings;
 
   // ─── Handlers para o controle Bluetooth ─────────────────────────────────────
-  // ↑ (ArrowUp / PageUp) → SEMPRE sobe o texto (recua a posição)
-  const handleScrollUp = useCallback(() => {
-    setScrollPos(prev => Math.max(0, prev - 150));
-  }, []);
-
-  // ↓ (ArrowDown / PageDown) → SEMPRE desce o texto (avança a posição)
-  const handleScrollDown = useCallback(() => {
-    setScrollPos(prev => prev + 150);
-  }, []);
+  // Ação de RECUA (Seta pra cima, Esquerda, Volume +, etc)
+  //   PAUSADO  → sobe o texto (recua)
+  //   PLAYING  → diminui velocidade
 
   // ← (ArrowLeft) → comportamento depende do estado:
   //   PAUSADO  → sobe o texto (recua)
@@ -104,23 +98,13 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
   useTeleprompterKeys({
     active: true,
     containerRef,
-    onScrollUp:        handleScrollUp,
-    onScrollDown:      handleScrollDown,
-    onSpeedDecrease:   handleLeft,
-    onSpeedIncrease:   handleRight,
+    onActionBackward:  handleLeft,
+    onActionForward:   handleRight,
     onTogglePlayPause: handleTogglePlay,
     onKeyDebug:        handleKeyDebug,
   });
 
   // ─── Fullscreen ──────────────────────────────────────────────────────────────
-  const [isPortrait, setIsPortrait] = useState(window.innerHeight > window.innerWidth);
-
-  useEffect(() => {
-    const handleResize = () => setIsPortrait(window.innerHeight > window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
   const toggleFullscreen = async () => {
     try {
       if (!document.fullscreenElement) {
@@ -148,7 +132,6 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
 
   const handleToggleRotation = () => {
     setIsRotatedCSS(!isRotatedCSS);
-    if (!isRotatedCSS) setIsPortrait(false);
   };
 
   // ─── Touch: scroll manual ───────────────────────────────────────────────────
@@ -188,33 +171,6 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
         } : {})
       }}
     >
-      {/* Aviso de Orientação */}
-      <AnimatePresence>
-        {isPortrait && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-8 text-center"
-          >
-            <motion.div 
-              animate={{ rotate: 90 }}
-              transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-            >
-              <Maximize2 size={64} className="text-dbe-blue mb-8" />
-            </motion.div>
-            <h2 className="text-2xl font-bold mb-4">Gire seu celular</h2>
-            <p className="text-zinc-400">O teleprompter funciona melhor em modo paisagem (horizontal).</p>
-            <button 
-              onClick={() => setIsPortrait(false)}
-              className="mt-8 text-xs uppercase font-bold tracking-widest text-zinc-500 hover:text-white"
-            >
-              Ignorar e continuar assim
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Guia de Leitura Central */}
       <div className="absolute top-1/2 left-0 w-full h-1 bg-dbe-blue/30 -translate-y-1/2 z-10 pointer-events-none" />
       <div className="absolute top-1/2 left-2 -translate-y-1/2 z-10 pointer-events-none">

@@ -57,11 +57,19 @@ const ViewPresentation: React.FC = () => {
     if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
   };
 
-  // Handlers de teclado
-  const handleScrollUp   = () => { scrollRef.current && (scrollRef.current.scrollTop -= 80); };
-  const handleScrollDown = () => { scrollRef.current && (scrollRef.current.scrollTop += 80); };
-  const handleSpeedDec   = () => setSpeed(s => Math.max(SPEED_MIN, s - 1));
-  const handleSpeedInc   = () => setSpeed(s => Math.min(SPEED_MAX, s + 1));
+  // Handlers de teclado (Contextuais: Pausado=Scroll, Rodando=Velocidade)
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
+  
+  const handleActionBackward = () => {
+    if (isPlayingRef.current) setSpeed(s => Math.max(SPEED_MIN, s - 1));
+    else scrollRef.current && (scrollRef.current.scrollTop -= 80);
+  };
+  
+  const handleActionForward = () => {
+    if (isPlayingRef.current) setSpeed(s => Math.min(SPEED_MAX, s + 1));
+    else scrollRef.current && (scrollRef.current.scrollTop += 80);
+  };
   const handleTogglePlay = () => setIsPlaying(p => !p);
   const handleKeyDebug   = (info: KeyDebugInfo) => {
     setDebugLog(prev => [info, ...prev].slice(0, 8));
@@ -70,10 +78,8 @@ const ViewPresentation: React.FC = () => {
   useTeleprompterKeys({
     active: showTeleprompter,
     containerRef,
-    onScrollUp:        handleScrollUp,
-    onScrollDown:      handleScrollDown,
-    onSpeedDecrease:   handleSpeedDec,
-    onSpeedIncrease:   handleSpeedInc,
+    onActionBackward:  handleActionBackward,
+    onActionForward:   handleActionForward,
     onTogglePlayPause: handleTogglePlay,
     onKeyDebug:        handleKeyDebug,
   });
@@ -203,9 +209,9 @@ const ViewPresentation: React.FC = () => {
                 <div className="flex items-center gap-1 bg-zinc-900 rounded-full px-3 py-1.5 border border-zinc-800">
                   <button
                     id="tp-speed-dec"
-                    onClick={handleSpeedDec}
+                    onClick={handleActionBackward}
                     className="text-zinc-400 hover:text-white transition-colors p-0.5"
-                    title="Diminuir velocidade (←)"
+                    title="Voltar / Diminuir velocidade (←)"
                   >
                     <ChevronLeft size={16} />
                   </button>
@@ -214,9 +220,9 @@ const ViewPresentation: React.FC = () => {
                   </span>
                   <button
                     id="tp-speed-inc"
-                    onClick={handleSpeedInc}
+                    onClick={handleActionForward}
                     className="text-zinc-400 hover:text-white transition-colors p-0.5"
-                    title="Aumentar velocidade (→)"
+                    title="Avançar / Aumentar velocidade (→)"
                   >
                     <ChevronRight size={16} />
                   </button>
