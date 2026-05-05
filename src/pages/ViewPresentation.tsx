@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStorage } from '../hooks/useStorage';
 import { useToast } from '../components/Toast';
-import { ArrowLeft, Download, Printer, Copy, FileCode, Edit2, Monitor, X } from 'lucide-react';
+import { ArrowLeft, Download, Printer, Copy, FileCode, Edit2, Monitor, X, Play, Pause, ChevronLeft, ChevronRight, Bug } from 'lucide-react';
 import PresentationPreview from '../components/PresentationPreview';
 import type { Presentation } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { dbeLogoBase64 } from '../constants/dbeLogo';
+import { useTeleprompterKeys, type KeyDebugInfo } from '../hooks/useTeleprompterKeys';
 
 const ViewPresentation: React.FC = () => {
   const { id } = useParams();
@@ -15,6 +16,65 @@ const ViewPresentation: React.FC = () => {
   const { showToast } = useToast();
   const [data, setData] = useState<Presentation | null>(null);
   const [showTeleprompter, setShowTeleprompter] = useState(false);
+
+  // ─── Estado do Teleprompter ───────────────────────────────────────────────
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [speed, setSpeed] = useState(2); // px por frame (1–10)
+  const [showDebug, setShowDebug] = useState(true);
+  const [debugLog, setDebugLog] = useState<KeyDebugInfo[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
+  const SPEED_MIN = 1;
+  const SPEED_MAX = 10;
+
+  // Scroll automático
+  const tick = useCallback(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop += speed * 0.5;
+    }
+    rafRef.current = requestAnimationFrame(tick);
+  }, [speed]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      rafRef.current = requestAnimationFrame(tick);
+    } else {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    }
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [isPlaying, tick]);
+
+  // Zera o estado ao fechar
+  const closeTeleprompter = () => {
+    setShowTeleprompter(false);
+    setIsPlaying(false);
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+  };
+
+  // Handlers de teclado
+  const handleScrollUp   = () => { scrollRef.current && (scrollRef.current.scrollTop -= 80); };
+  const handleScrollDown = () => { scrollRef.current && (scrollRef.current.scrollTop += 80); };
+  const handleSpeedDec   = () => setSpeed(s => Math.max(SPEED_MIN, s - 1));
+  const handleSpeedInc   = () => setSpeed(s => Math.min(SPEED_MAX, s + 1));
+  const handleTogglePlay = () => setIsPlaying(p => !p);
+  const handleKeyDebug   = (info: KeyDebugInfo) => {
+    setDebugLog(prev => [info, ...prev].slice(0, 8));
+  };
+
+  useTeleprompterKeys({
+    active: showTeleprompter,
+    onScrollUp:        handleScrollUp,
+    onScrollDown:      handleScrollDown,
+    onSpeedDecrease:   handleSpeedDec,
+    onSpeedIncrease:   handleSpeedInc,
+    onTogglePlayPause: handleTogglePlay,
+    onKeyDebug:        handleKeyDebug,
+  });
 
   useEffect(() => {
     if (id) {
@@ -121,50 +181,217 @@ const ViewPresentation: React.FC = () => {
       {/* Teleprompter Modal */}
       <AnimatePresence>
         {showTeleprompter && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black flex flex-col p-6 md:p-12"
+            className="fixed inset-0 z-[100] bg-black flex flex-col"
           >
-            <div className="flex items-center justify-between mb-8 no-print">
-              <h2 className="text-2xl font-display font-black uppercase italic tracking-widest text-dbe-blue">
+            {/* ── Barra superior ── */}
+            <div className="flex items-center justify-between px-5 py-3 bg-zinc-950/90 backdrop-blur border-b border-zinc-800 no-print shrink-0">
+              <h2 className="text-lg font-black uppercase italic tracking-widest text-dbe-blue truncate">
                 Teleprompter — {data.clientName}
               </h2>
-              <div className="flex gap-4">
-                <button 
+
+              <div className="flex items-center gap-2">
+                {/* Velocidade */}
+                <div className="flex items-center gap-1 bg-zinc-900 rounded-full px-3 py-1.5 border border-zinc-800">
+                  <button
+                    id="tp-speed-dec"
+                    onClick={handleSpeedDec}
+                    className="text-zinc-400 hover:text-white transition-colors p-0.5"
+                    title="Diminuir velocidade (←)"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="text-xs font-bold text-white w-10 text-center">
+                    {speed}x
+                  </span>
+                  <button
+                    id="tp-speed-inc"
+                    onClick={handleSpeedInc}
+                    className="text-zinc-400 hover:text-white transition-colors p-0.5"
+                    title="Aumentar velocidade (→)"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+
+                {/* Play / Pause */}
+                <button
+                  id="tp-play-pause"
+                  onClick={handleTogglePlay}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                    isPlaying
+                      ? 'bg-amber-500 hover:bg-amber-600 text-black'
+                      : 'bg-dbe-blue hover:bg-blue-500 text-white'
+                  }`}
+                  title="Play / Pause (Enter · Space · MediaPlayPause)"
+                >
+                  {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                  {isPlaying ? 'Pausar' : 'Reproduzir'}
+                </button>
+
+                {/* Debug toggle */}
+                <button
+                  id="tp-debug-toggle"
+                  onClick={() => setShowDebug(d => !d)}
+                  className={`p-2 rounded-full transition-all ${
+                    showDebug ? 'bg-violet-600 text-white' : 'bg-zinc-900 text-zinc-500 hover:text-white'
+                  }`}
+                  title="Painel de debug"
+                >
+                  <Bug size={16} />
+                </button>
+
+                {/* Copiar */}
+                <button
                   onClick={() => {
                     navigator.clipboard.writeText(teleprompterText);
                     showToast('Texto do teleprompter copiado!', 'success');
                   }}
-                  className="btn-primary"
+                  className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all"
+                  title="Copiar texto"
                 >
-                  <Copy size={18} />
-                  Copiar Tudo
+                  <Copy size={16} />
                 </button>
-                <button 
-                  onClick={() => window.print()}
-                  className="btn-secondary"
+
+                {/* Fechar */}
+                <button
+                  id="tp-close"
+                  onClick={closeTeleprompter}
+                  className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all"
+                  title="Fechar"
                 >
-                  <Printer size={18} />
-                  Baixar PDF
-                </button>
-                <button onClick={() => setShowTeleprompter(false)} className="btn-ghost bg-zinc-900 rounded-full p-2">
-                  <X size={24} />
+                  <X size={20} />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto bg-zinc-900/30 rounded-3xl border border-zinc-800 p-8 md:p-16">
-              <div className="max-w-3xl mx-auto">
-                <pre className="whitespace-pre-wrap font-sans text-3xl md:text-5xl font-medium leading-[1.6] text-white">
-                  {teleprompterText}
-                </pre>
+            {/* ── Corpo principal ── */}
+            <div className="flex flex-1 overflow-hidden">
+              {/* Texto do teleprompter */}
+              <div
+                ref={scrollRef}
+                className="flex-1 overflow-y-auto px-8 md:px-24 py-12"
+                style={{ scrollBehavior: 'auto' }}
+              >
+                <div className="max-w-3xl mx-auto pb-[60vh]">
+                  <pre
+                    className="whitespace-pre-wrap font-sans text-3xl md:text-5xl font-medium leading-[1.7] text-white"
+                    style={{ textShadow: '0 2px 20px rgba(0,0,0,0.8)' }}
+                  >
+                    {teleprompterText}
+                  </pre>
+                </div>
               </div>
+
+              {/* ── Painel de Debug ── */}
+              <AnimatePresence>
+                {showDebug && (
+                  <motion.aside
+                    initial={{ x: 320, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    exit={{ x: 320, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+                    className="w-72 shrink-0 bg-zinc-950 border-l border-zinc-800 flex flex-col"
+                  >
+                    <div className="px-4 py-3 border-b border-zinc-800">
+                      <p className="text-xs font-bold text-violet-400 uppercase tracking-widest">
+                        🎮 Debug — Bluetooth HID
+                      </p>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">
+                        Pressione qualquer tecla / botão do controle
+                      </p>
+                    </div>
+
+                    {/* Última tecla em destaque */}
+                    {debugLog[0] ? (
+                      <div className="px-4 py-4 border-b border-zinc-800 bg-violet-950/30">
+                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Última tecla</p>
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between">
+                            <span className="text-[11px] text-zinc-400">event.key</span>
+                            <span className="text-[11px] font-mono font-bold text-violet-300">
+                              {debugLog[0].key === ' ' ? 'Space' : debugLog[0].key}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[11px] text-zinc-400">event.code</span>
+                            <span className="text-[11px] font-mono font-bold text-blue-300">{debugLog[0].code}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[11px] text-zinc-400">event.keyCode</span>
+                            <span className="text-[11px] font-mono font-bold text-green-300">{debugLog[0].keyCode}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[11px] text-zinc-400">type</span>
+                            <span className={`text-[11px] font-mono font-bold ${
+                              debugLog[0].type === 'keydown' ? 'text-amber-300' : 'text-zinc-400'
+                            }`}>{debugLog[0].type}</span>
+                          </div>
+                          {debugLog[0].action && (
+                            <div className="flex justify-between">
+                              <span className="text-[11px] text-zinc-400">ação</span>
+                              <span className="text-[11px] font-mono font-bold text-emerald-400">{debugLog[0].action}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="px-4 py-6 text-center text-zinc-600 text-xs">
+                        Aguardando tecla...
+                      </div>
+                    )}
+
+                    {/* Histórico */}
+                    <div className="flex-1 overflow-y-auto px-4 py-2">
+                      <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-2">Histórico</p>
+                      {debugLog.slice(1).map((entry, i) => (
+                        <div key={i} className="py-1.5 border-b border-zinc-900 flex justify-between items-center">
+                          <span className="text-[10px] font-mono text-zinc-400">
+                            {entry.key === ' ' ? '"Space"' : `"${entry.key}"`}
+                          </span>
+                          <span className={`text-[10px] font-mono ${
+                            entry.action ? 'text-emerald-500' : 'text-zinc-600'
+                          }`}>
+                            {entry.action ?? entry.code}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Mapa de teclas */}
+                    <div className="px-4 py-3 border-t border-zinc-800">
+                      <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Mapeamento ativo</p>
+                      <div className="space-y-1">
+                        {[
+                          { label: '↑ Subir',      keys: 'ArrowUp' },
+                          { label: '↓ Descer',     keys: 'ArrowDown' },
+                          { label: '← Vel-',       keys: 'ArrowLeft' },
+                          { label: '→ Vel+',       keys: 'ArrowRight' },
+                          { label: '⏯ Play/Pause', keys: 'Enter / Space / Media' },
+                        ].map(m => (
+                          <div key={m.label} className="flex justify-between">
+                            <span className="text-[10px] text-zinc-400">{m.label}</span>
+                            <span className="text-[10px] font-mono text-violet-400">{m.keys}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.aside>
+                )}
+              </AnimatePresence>
             </div>
-            
-            <div className="mt-8 text-center text-zinc-600 font-medium tracking-widest text-xs uppercase no-print">
-              DICA: USE O ATALHO CTRL+P PARA IMPRIMIR ESTA TELA
+
+            {/* ── Barra de status inferior ── */}
+            <div className="shrink-0 flex items-center justify-between px-5 py-2 bg-zinc-950/80 border-t border-zinc-800 text-[11px] text-zinc-600 no-print">
+              <span>↑↓ Scroll manual &nbsp;·&nbsp; ←→ Velocidade &nbsp;·&nbsp; Enter/Space = Play/Pause</span>
+              <span className={`font-bold ${
+                isPlaying ? 'text-amber-400 animate-pulse' : 'text-zinc-600'
+              }`}>
+                {isPlaying ? '▶ REPRODUZINDO' : '⏸ PARADO'}
+              </span>
             </div>
           </motion.div>
         )}
