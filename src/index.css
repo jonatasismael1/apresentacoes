@@ -6,7 +6,7 @@
 
 @layer base {
   body {
-    @apply bg-dbe-darker text-white font-sans antialiased;
+    @apply bg-dbe-darker text-white font-sans antialiased overflow-x-hidden;
   }
 }
 

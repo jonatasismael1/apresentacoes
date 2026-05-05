@@ -42,7 +42,7 @@ const PresentationPreview: React.FC<PreviewProps> = ({ data, isPrint = false }) 
   const primaryColor = data.primaryColor || '#0047FF';
   
   return (
-    <div className={`w-full mx-auto ${isPrint ? 'bg-white text-black' : 'bg-zinc-950 text-white min-h-screen'}`}>
+    <div className={`w-full mx-auto overflow-x-hidden ${isPrint ? 'bg-white text-black' : 'bg-zinc-950 text-white min-h-screen'}`}>
       {/* Cover */}
       <section className="relative min-h-[600px] flex flex-col items-center justify-center text-center p-8 overflow-hidden">
         {/* Background Accent */}
