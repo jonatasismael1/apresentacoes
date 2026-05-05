@@ -24,7 +24,19 @@ const ViewPresentation: React.FC = () => {
   }, [id, getPresentation]);
 
   const handlePrint = () => {
-    window.print();
+    if (!data) return;
+    const htmlContent = generateStandaloneHTML(data);
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      // Wait for resources if needed, then print
+      printWindow.onload = () => {
+        printWindow.print();
+        // Option to close the window after print, but some browsers block it
+        // printWindow.close();
+      };
+    }
   };
 
   const handleCopyContent = () => {
@@ -161,10 +173,7 @@ const ViewPresentation: React.FC = () => {
   );
 };
 
-// Function to generate a standalone HTML file
 const generateStandaloneHTML = (data: Presentation) => {
-  const primaryColor = data.primaryColor || '#0090D0';
-  const secondaryColor = data.secondaryColor || '#22C55E';
   const clientLogo = data.clientLogo
     ? data.clientLogo.startsWith('data:')
       ? data.clientLogo
@@ -173,324 +182,325 @@ const generateStandaloneHTML = (data: Presentation) => {
   
   return `
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DBE - ${data.clientName}</title>
-    <style>
-        /* CSS RESET & BASE */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-          background-color: #000000; 
-          color: #ffffff; 
-          line-height: 1.5;
-          -webkit-print-color-adjust: exact;
-        }
-        
-        /* LAYOUT UTILS */
-        .min-h-screen { min-height: 100vh; }
-        .flex { display: flex; }
-        .flex-col { flex-direction: column; }
-        .items-center { align-items: center; }
-        .justify-center { justify-content: center; }
-        .text-center { text-align: center; }
-        .relative { position: relative; }
-        .overflow-hidden { overflow: hidden; }
-        .w-full { width: 100%; }
-        .max-w-4xl { max-width: 56rem; }
-        .max-w-6xl { max-width: 72rem; }
-        .mx-auto { margin-left: auto; margin-right: auto; }
-        .p-8 { padding: 2rem; }
-        .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
-        .py-32 { padding-top: 8rem; padding-bottom: 8rem; }
-        .mb-8 { margin-bottom: 2rem; }
-        .mb-12 { margin-bottom: 3rem; }
-        .gap-4 { gap: 1rem; }
-        
-        /* PREMIUM STYLES */
-        .bg-mesh {
-          background-color: #000000;
-          background-image: 
-            radial-gradient(at 0% 0%, ${primaryColor}20 0px, transparent 50%),
-            radial-gradient(at 100% 0%, ${primaryColor}15 0px, transparent 50%);
-        }
-        
-        .glass {
-          background: rgba(255, 255, 255, 0.03);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 2rem;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DBE - ${data.clientName}</title>
+  <style>
+    :root {
+      --blue: #006f9f;
+      --deep-blue: #004a72;
+      --green: #00b851;
+      --ink: #102331;
+      --muted: #5e7180;
+      --paper: #f4f9fb;
+      --white: #ffffff;
+      --line: #dce9ef;
+    }
 
-        .capsule {
-          padding: 0.5rem 1.5rem;
-          border-radius: 9999px;
-          font-size: 0.75rem;
-          font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-        }
+    * {
+      box-sizing: border-box;
+    }
 
-        .tag-blue { background: ${secondaryColor}1a; color: ${secondaryColor}; border: 1px solid ${secondaryColor}33; }
-        .tag-zinc { background: rgba(39, 39, 42, 0.5); color: #a1a1aa; border: 1px solid #27272a; }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(0,184,81,.16), transparent 34%),
+        radial-gradient(circle at top right, rgba(0,111,159,.18), transparent 30%),
+        var(--paper);
+      line-height: 1.55;
+    }
 
-        /* TYPOGRAPHY */
-        .title-main {
-          font-size: clamp(2rem, 6vw, 3.5rem);
-          font-weight: 900;
-          text-transform: uppercase;
-          font-style: italic;
-          letter-spacing: -0.05em;
-          line-height: 0.9;
-          margin-bottom: 2rem;
-        }
+    .page {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 40px 0 60px;
+    }
 
-        .script-card {
-          margin-bottom: 6rem;
-          position: relative;
-        }
+    .hero {
+      background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(242,249,252,.94));
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      padding: 34px;
+      box-shadow: 0 24px 70px rgba(0, 74, 114, .12);
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 32px;
+      align-items: center;
+      margin-bottom: 28px;
+    }
 
-        .script-number {
-          position: absolute;
-          left: -1rem;
-          top: -1.5rem;
-          font-size: 6rem;
-          font-weight: 900;
-          font-style: italic;
-          opacity: 0.05;
-          color: ${primaryColor};
-          pointer-events: none;
-        }
+    .logo-wrap {
+      background: var(--white);
+      border-radius: 22px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      box-shadow: 0 14px 36px rgba(0, 74, 114, .10);
+    }
 
-        .script-header {
-          display: flex;
-          align-items: center;
-          gap: 1.5rem;
-          margin-bottom: 2rem;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          padding-bottom: 1.5rem;
-        }
+    .logo {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
 
-        .index-box {
-          width: 3rem;
-          height: 3rem;
-          background: ${primaryColor};
-          color: #000;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 900;
-          font-style: italic;
-          font-size: 1.25rem;
-          border-radius: 1rem;
-        }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(0,184,81,.10);
+      color: var(--deep-blue);
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      letter-spacing: .02em;
+    }
 
-        .script-title {
-          font-size: 1.75rem;
-          font-weight: 900;
-          text-transform: uppercase;
-          font-style: italic;
-        }
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 54px);
+      line-height: 1.02;
+      color: var(--deep-blue);
+      letter-spacing: -0.04em;
+    }
 
-        .grid-container {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 1.5rem;
-        }
-        @media (min-width: 1024px) {
-          .grid-container { grid-template-columns: 7fr 5fr; }
-        }
+    .subtitle {
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+      max-width: 760px;
+    }
 
-        .content-block {
-          padding: 1.5rem;
-          margin-bottom: 1.5rem;
-        }
+    .client {
+      margin-top: 22px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
 
-        .hook-box {
-          border-left: 4px solid #39FF14;
-          background: rgba(57, 255, 20, 0.03);
-        }
-        .hook-label { color: #39FF14; font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 1rem; display: block;}
-        .hook-text { font-size: 1.2rem; font-weight: 700; }
+    .pill {
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--white);
+      color: var(--deep-blue);
+      font-weight: 700;
+      font-size: 14px;
+    }
 
-        .cta-box {
-          background: ${primaryColor};
-          color: #000;
-          padding: 2rem;
-          border-radius: 1.5rem;
-        }
-        .cta-label { opacity: 0.5; font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 1rem; display: block;}
-        .cta-text { font-size: 1.5rem; font-weight: 900; text-transform: uppercase; font-style: italic; line-height: 1; }
-        .logo-frame {
-          width: 120px;
-          height: 120px;
-          border-radius: 28px;
-          background: rgba(255,255,255,0.08);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin: 0 auto 1.5rem;
-          box-shadow: 0 24px 60px rgba(0,0,0,0.25);
-        }
-        .logo-frame img {
-          max-width: 100%;
-          max-height: 100%;
-          object-fit: contain;
-          border-radius: 18px;
-        }
-        .tagline {
-          font-size: 0.75rem;
-          font-weight: 900;
-          letter-spacing: 0.25em;
-          color: #999;
-          text-transform: uppercase;
-          margin-bottom: 1.5rem;
-        }
-        .cover {
-          min-height: 100vh;
-          padding: 4rem 2rem;
-        }
-        .content-section {
-          padding: 4rem 0;
-        }
+    .grid {
+      display: grid;
+      gap: 22px;
+    }
 
-        @media (max-width: 768px) {
-          .cover {
-            padding: 3rem 1.25rem;
-          }
-          .logo-frame {
-            width: 96px;
-            height: 96px;
-          }
-          .tagline {
-            font-size: 0.65rem;
-            margin-bottom: 1rem;
-          }
-          .title-main {
-            font-size: clamp(1.75rem, 8vw, 2.5rem);
-          }
-          .glass {
-            padding: 1.5rem;
-          }
-          .grid-container {
-            gap: 1.5rem;
-          }
-          .script-header {
-            flex-wrap: wrap;
-            gap: 1rem;
-          }
-          .index-box {
-            width: 2.75rem;
-            height: 2.75rem;
-            font-size: 1.15rem;
-          }
-        }
+    .card {
+      background: rgba(255,255,255,.97);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 18px 54px rgba(0, 74, 114, .10);
+      break-inside: avoid;
+    }
 
-        @media print {
-          body, .bg-mesh { background-color: #000000 !important; color: #ffffff !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .glass { border: 1px solid rgba(255,255,255,0.1) !important; background: rgba(255,255,255,0.03) !important; color: #ffffff !important; box-shadow: none !important; backdrop-filter: none !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .title-main { color: #ffffff !important; }
-          .cta-box { background: ${primaryColor} !important; color: #000 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .page-break { page-break-after: always; }
-          .no-print { display: none !important; }
-        }
-    </style>
+    .card-top {
+      display: grid;
+      grid-template-columns: 62px 1fr;
+      gap: 18px;
+      align-items: start;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 20px;
+    }
+
+    .number {
+      width: 62px;
+      height: 62px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--blue), var(--green));
+      color: var(--white);
+      font-weight: 800;
+      font-size: 20px;
+      box-shadow: 0 10px 24px rgba(0, 111, 159, .22);
+    }
+
+    h2 {
+      margin: 0;
+      color: var(--deep-blue);
+      font-size: clamp(22px, 2.5vw, 32px);
+      letter-spacing: -0.025em;
+      line-height: 1.15;
+    }
+
+    .tone {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+      font-style: italic;
+    }
+
+    .script-block {
+      padding: 16px 0;
+      border-bottom: 1px solid rgba(220, 233, 239, .8);
+    }
+
+    .script-block:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .block-label {
+      color: var(--green);
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 32px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 760px) {
+      .page {
+        width: min(100% - 22px, 1120px);
+        padding: 22px 0 40px;
+      }
+
+      .hero {
+        grid-template-columns: 1fr;
+        padding: 24px;
+        border-radius: 22px;
+      }
+
+      .logo-wrap {
+        max-width: 210px;
+      }
+
+      .card {
+        padding: 22px;
+        border-radius: 20px;
+      }
+
+      .card-top {
+        grid-template-columns: 50px 1fr;
+        gap: 14px;
+      }
+
+      .number {
+        width: 50px;
+        height: 50px;
+        border-radius: 14px;
+        font-size: 17px;
+      }
+
+      p {
+        font-size: 16px;
+      }
+    }
+
+    @media print {
+      body {
+        background: var(--white);
+      }
+
+      .page {
+        width: 100%;
+        padding: 0;
+      }
+
+      .hero, .card {
+        box-shadow: none;
+      }
+
+      .card {
+        page-break-inside: avoid;
+        margin-bottom: 18px;
+      }
+    }
+  </style>
 </head>
-<body class="bg-mesh">
-    <!-- Capa Premium -->
-    <div class="cover flex flex-col items-center justify-center relative overflow-hidden text-center">
-        <img src="${dbeLogoBase64}" alt="DBE" style="height: 6rem; margin-bottom: 3rem; opacity: 0.9;" />
-        
-        <h1 class="title-main">${data.title}</h1>
-
-        <div class="flex items-center justify-center gap-4 mb-12">
-            <div class="capsule tag-blue">${data.clientName}</div>
-            <div class="capsule tag-zinc">${data.clientSegment}</div>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="logo-wrap">
+        <img class="logo" src="${dbeLogoBase64}" alt="Logo DBE" />
+      </div>
+      <div>
+        <div class="eyebrow">Roteiros para aprovação</div>
+        <h1>${data.title}</h1>
+        <p class="subtitle">${data.objective}</p>
+        <div class="client">
+          <span class="pill">Cliente: ${data.clientName}</span>
+          <span class="pill">Formato: ${data.format}</span>
+          <span class="pill">Produção: DBE</span>
         </div>
+      </div>
+    </header>
 
-        ${data.objective ? `
-        <div class="glass" style="padding: 2rem; max-width: 600px; margin: 0 auto; position: relative;">
-            <div style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: ${primaryColor}; padding: 4px 16px; border-radius: 20px; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; color: #fff;">
-                Objetivo da Campanha
+    <section class="grid">
+      ${data.scripts.map((script, index) => `
+        <article class="card" id="roteiro-${index + 1}">
+          <div class="card-top">
+            <span class="number">${(index + 1).toString().padStart(2, '0')}</span>
+            <div>
+              <h2>${script.title}</h2>
+              <p class="tone">Tonalidade: ${script.tone}</p>
             </div>
-            <p style="font-size: 1.25rem; color: #ccc; line-height: 1.6;">
-                ${data.objective}
-            </p>
-        </div>
-        ` : ''}
+          </div>
+          
+          <section class="script-block">
+            <div class="block-label">Gancho</div>
+            <p>${script.hook.replace(/\n/g, '<br>')}</p>
+          </section>
+          
+          <section class="script-block">
+            <div class="block-label">Desenvolvimento</div>
+            <p>${script.development.replace(/\n/g, '<br>')}</p>
+          </section>
+          
+          <section class="script-block">
+            <div class="block-label">CTA</div>
+            <p>${script.cta.replace(/\n/g, '<br>')}</p>
+          </section>
+          
+          ${script.notes ? `
+          <section class="script-block">
+            <div class="block-label">Observações</div>
+            <p><i>${script.notes.replace(/\n/g, '<br>')}</i></p>
+          </section>
+          ` : ''}
+          
+          ${script.referenceLink ? `
+          <section class="script-block">
+            <div class="block-label">Referência</div>
+            <p><a href="${script.referenceLink}" target="_blank" style="color: var(--blue); text-decoration: none;">${script.referenceLink}</a></p>
+          </section>
+          ` : ''}
+        </article>
+      `).join('')}
+    </section>
 
-        <div style="position: absolute; bottom: 3rem; width: 100%; display: flex; justify-center; gap: 3rem; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; color: #555; justify-content: center;">
-            <span>${data.responsible}</span>
-            <span>${data.date}</span>
-            <span>${data.format}</span>
-        </div>
-    </div>
-
-    <!-- Conteúdo -->
-    <div class="max-w-6xl mx-auto px-6 py-32">
-        ${data.scripts.map((script, index) => `
-            <div class="script-card">
-                <div class="script-number">${(index + 1).toString().padStart(2, '0')}</div>
-
-                <div class="relative">
-                    <header class="script-header" style="justify-content: space-between;">
-                        <div class="flex items-center" style="gap: 1.5rem;">
-                            <div class="index-box">${index + 1}</div>
-                            <h2 class="script-title">${script.title}</h2>
-                        </div>
-                        <img src="${dbeLogoBase64}" alt="DBE" style="height: 2rem; opacity: 0.5;" />
-                    </header>
-
-                    <div class="grid-container">
-                        <div class="flex flex-col gap-4">
-                            <div class="glass content-block hook-box">
-                                <span class="hook-label">Gancho (Hook)</span>
-                                <p class="hook-text">${script.hook}</p>
-                            </div>
-
-                            <div class="glass content-block">
-                                <span style="font-size: 0.7rem; font-weight: 900; text-transform: uppercase; color: #555; display: block; margin-bottom: 1rem;">Desenvolvimento</span>
-                                <div style="font-size: 1.1rem; color: #bbb;">
-                                    ${script.development.split('\n').map(p => `<p style="margin-bottom: 1rem;">${p}</p>`).join('')}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col gap-4">
-                            <div class="cta-box">
-                                <span class="cta-label">Call to Action</span>
-                                <p class="cta-text">${script.cta}</p>
-                            </div>
-
-                            ${script.notes ? `
-                            <div class="glass content-block" style="border-style: dashed;">
-                                <span style="font-size: 0.7rem; font-weight: 900; text-transform: uppercase; color: #444; display: block; margin-bottom: 0.5rem; font-style: italic;">Observações</span>
-                                <p style="font-size: 0.9rem; color: #888; font-style: italic;">${script.notes}</p>
-                            </div>` : ''}
-
-                            ${script.referenceLink ? `
-                            <div class="glass" style="padding: 1.5rem; border-radius: 1.5rem;">
-                                <span style="font-size: 0.7rem; font-weight: 900; text-transform: uppercase; color: #444; display: block; margin-bottom: 0.5rem;">Referência</span>
-                                <a href="${script.referenceLink}" target="_blank" style="color: ${primaryColor}; font-size: 0.75rem; text-decoration: none; font-weight: 700; word-break: break-all;">${script.referenceLink}</a>
-                            </div>` : ''}
-                        </div>
-                    </div>
-                </div>
-                ${index < data.scripts.length - 1 ? '<div class="page-break"></div>' : ''}
-            </div>
-        `).join('')}
-    </div>
-
-    <!-- Rodapé -->
-    <footer style="padding: 8rem 2rem; text-align: center; border-top: 1px solid #111;">
-        ${clientLogo ? `<img src="${clientLogo}" alt="Logo do cliente" style="max-height: 56px; margin-bottom: 1.5rem; filter: grayscale(60%) opacity(0.65);" />` : ''}
-        <p style="font-size: 10px; font-weight: 900; letter-spacing: 0.5em; color: #333; text-transform: uppercase;">
-            Dos Bastidores ao Espetáculo &copy; 2026
-        </p>
+    <footer class="footer">
+      DBE — Dos Bastidores ao Espetáculo
+      ${clientLogo ? `<br><img src="${clientLogo}" alt="Logo Cliente" style="max-height: 40px; margin-top: 10px; opacity: 0.5;">` : ''}
     </footer>
+  </main>
 </body>
 </html>
   `;
