@@ -171,176 +171,248 @@ const generateStandaloneHTML = (data: Presentation) => {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DBE - ${data.clientName}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              'dbe-blue': '#0090D0',
-              'dbe-green': '#39FF14',
-            },
-            fontFamily: {
-              'display': ['Outfit', 'sans-serif'],
-              'sans': ['Inter', 'sans-serif'],
-            }
-          }
-        }
-      }
-    </script>
     <style>
+        /* CSS RESET & BASE */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
-          font-family: 'Inter', sans-serif; 
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
           background-color: #000000; 
-          color: white; 
+          color: #ffffff; 
+          line-height: 1.5;
           -webkit-print-color-adjust: exact;
         }
+        
+        /* LAYOUT UTILS */
+        .min-h-screen { min-height: 100vh; }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-center { justify-content: center; }
+        .text-center { text-align: center; }
+        .relative { position: relative; }
+        .overflow-hidden { overflow: hidden; }
+        .w-full { width: 100%; }
+        .max-w-4xl { max-width: 56rem; }
+        .max-w-6xl { max-width: 72rem; }
+        .mx-auto { margin-left: auto; margin-right: auto; }
+        .p-8 { padding: 2rem; }
+        .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+        .py-32 { padding-top: 8rem; padding-bottom: 8rem; }
+        .mb-8 { margin-bottom: 2rem; }
+        .mb-12 { margin-bottom: 3rem; }
+        .gap-4 { gap: 1rem; }
+        
+        /* PREMIUM STYLES */
         .bg-mesh {
           background-color: #000000;
           background-image: 
-            radial-gradient(at 0% 0%, ${primaryColor}15 0px, transparent 50%),
-            radial-gradient(at 100% 0%, ${primaryColor}10 0px, transparent 50%);
+            radial-gradient(at 0% 0%, ${primaryColor}20 0px, transparent 50%),
+            radial-gradient(at 100% 0%, ${primaryColor}15 0px, transparent 50%);
         }
+        
         .glass {
           background: rgba(255, 255, 255, 0.03);
-          backdrop-filter: blur(10px);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
           border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 2rem;
         }
+
+        .capsule {
+          padding: 0.5rem 1.5rem;
+          border-radius: 9999px;
+          font-size: 0.75rem;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+        }
+
+        .tag-blue { background: rgba(0, 144, 208, 0.1); color: #0090D0; border: 1px solid rgba(0, 144, 208, 0.2); }
+        .tag-zinc { background: rgba(39, 39, 42, 0.5); color: #a1a1aa; border: 1px solid #27272a; }
+
+        /* TYPOGRAPHY */
+        .title-main {
+          font-size: clamp(3rem, 10vw, 5rem);
+          font-weight: 900;
+          text-transform: uppercase;
+          font-style: italic;
+          letter-spacing: -0.05em;
+          line-height: 0.9;
+          margin-bottom: 2rem;
+        }
+
+        .script-card {
+          margin-bottom: 10rem;
+          position: relative;
+        }
+
+        .script-number {
+          position: absolute;
+          left: -2rem;
+          top: -2rem;
+          font-size: 12rem;
+          font-weight: 900;
+          font-style: italic;
+          opacity: 0.05;
+          color: ${primaryColor};
+          pointer-events: none;
+        }
+
+        .script-header {
+          display: flex;
+          align-items: center;
+          gap: 1.5rem;
+          margin-bottom: 3rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          padding-bottom: 2rem;
+        }
+
+        .index-box {
+          width: 3.5rem;
+          height: 3.5rem;
+          background: ${primaryColor};
+          color: #000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 900;
+          font-style: italic;
+          font-size: 1.5rem;
+          border-radius: 1rem;
+        }
+
+        .script-title {
+          font-size: 2.5rem;
+          font-weight: 900;
+          text-transform: uppercase;
+          font-style: italic;
+        }
+
+        .grid-container {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 2rem;
+        }
+        @media (min-width: 1024px) {
+          .grid-container { grid-template-columns: 7fr 5fr; }
+        }
+
+        .content-block {
+          padding: 2rem;
+          margin-bottom: 2rem;
+        }
+
+        .hook-box {
+          border-left: 4px solid #39FF14;
+          background: rgba(57, 255, 20, 0.03);
+        }
+        .hook-label { color: #39FF14; font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 1rem; display: block;}
+        .hook-text { font-size: 1.5rem; font-weight: 700; }
+
+        .cta-box {
+          background: ${primaryColor};
+          color: #000;
+          padding: 2.5rem;
+          border-radius: 2rem;
+        }
+        .cta-label { opacity: 0.5; font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 1rem; display: block;}
+        .cta-text { font-size: 2rem; font-weight: 900; text-transform: uppercase; font-style: italic; line-height: 1; }
+
         @media print {
-            body { background: white !important; color: black !important; }
-            .no-print { display: none !important; }
-            .glass { background: white !important; border: 1px solid #eee !important; color: black !important; }
-            .bg-mesh { background: white !important; }
-            .page-break { page-break-after: always; }
+          body { background: #fff; color: #000; }
+          .bg-mesh { background: #fff; }
+          .glass { border: 1px solid #ddd; background: #fff; color: #000; box-shadow: none; backdrop-filter: none; }
+          .title-main { color: #000; }
+          .cta-box { border: 2px solid #000; background: #fff; }
+          .page-break { page-break-after: always; }
+          .no-print { display: none; }
         }
     </style>
 </head>
-<body class="bg-mesh min-h-screen">
+<body class="bg-mesh">
     <!-- Capa Premium -->
     <div class="min-h-screen flex flex-col items-center justify-center p-8 relative overflow-hidden">
-        <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 pointer-events-none"></div>
-        
         <div class="relative z-10 w-full max-w-4xl mx-auto text-center">
-            <div class="mb-12 inline-block">
-                <div class="flex items-center gap-4">
-                  <div class="w-16 h-16 rounded-2xl flex items-center justify-center text-black font-black italic text-2xl" style="background-color: ${primaryColor}">
+            <div class="mb-12 flex justify-center">
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                  <div style="width: 60px; height: 60px; background: ${primaryColor}; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-style: italic; color: #000; font-size: 20px;">
                     DBE
                   </div>
-                  <div class="text-left">
-                    <div class="text-xs font-black tracking-[0.3em] uppercase text-zinc-500">Dos Bastidores</div>
-                    <div class="text-xs font-black tracking-[0.3em] uppercase text-zinc-500">Ao Espetáculo</div>
+                  <div style="text-align: left;">
+                    <div style="font-size: 10px; font-weight: 900; letter-spacing: 0.2em; color: #666; text-transform: uppercase;">Dos Bastidores</div>
+                    <div style="font-size: 10px; font-weight: 900; letter-spacing: 0.2em; color: #666; text-transform: uppercase;">Ao Espetáculo</div>
                   </div>
                 </div>
             </div>
 
-            <h1 class="text-6xl md:text-8xl font-display font-black mb-8 tracking-tighter leading-none italic uppercase">
-                ${data.title}
-            </h1>
+            <h1 class="title-main">${data.title}</h1>
 
-            <div class="flex flex-wrap items-center justify-center gap-4 mb-16">
-                <div class="px-6 py-2 rounded-full glass text-sm font-bold uppercase tracking-widest text-dbe-blue">
-                    ${data.clientName}
-                </div>
-                <div class="px-6 py-2 rounded-full border border-zinc-800 text-sm font-bold uppercase tracking-widest text-zinc-400">
-                    ${data.clientSegment}
-                </div>
+            <div class="flex items-center justify-center gap-4 mb-12">
+                <div class="capsule tag-blue">${data.clientName}</div>
+                <div class="capsule tag-zinc">${data.clientSegment}</div>
             </div>
 
-            <div class="glass p-10 rounded-[2rem] max-w-2xl mx-auto relative group transition-all duration-500 hover:border-dbe-blue/30">
-                <div class="absolute -top-4 left-1/2 -translate-x-1/2 px-6 py-1 bg-dbe-blue rounded-full text-[10px] font-black uppercase tracking-[0.2em]">
+            <div class="glass" style="padding: 3rem; max-width: 600px; margin: 0 auto; position: relative;">
+                <div style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: ${primaryColor}; padding: 4px 16px; border-radius: 20px; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em;">
                     Objetivo da Campanha
                 </div>
-                <p class="text-2xl font-medium text-zinc-200 leading-relaxed italic">
+                <p style="font-size: 1.25rem; color: #ccc; font-style: italic; line-height: 1.6;">
                     "${data.objective}"
                 </p>
             </div>
         </div>
 
-        <div class="absolute bottom-12 left-0 w-full flex justify-center gap-12 text-[10px] text-zinc-500 font-black uppercase tracking-[0.3em]">
-            <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 bg-dbe-blue rounded-full"></div> ${data.responsible}</div>
-            <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 bg-zinc-700 rounded-full"></div> ${data.date}</div>
-            <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 bg-zinc-700 rounded-full"></div> ${data.format}</div>
+        <div style="position: absolute; bottom: 3rem; width: 100%; display: flex; justify-center; gap: 3rem; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; color: #555; justify-content: center;">
+            <span>${data.responsible}</span>
+            <span>${data.date}</span>
+            <span>${data.format}</span>
         </div>
     </div>
 
     <!-- Conteúdo -->
     <div class="max-w-6xl mx-auto px-6 py-32">
         ${data.scripts.map((script, index) => `
-            <div class="mb-40 relative group">
-                <!-- Número de Fundo -->
-                <div class="absolute -left-20 -top-10 text-[15rem] font-display font-black opacity-[0.03] select-none italic" style="color: ${primaryColor}">
-                    ${(index + 1).toString().padStart(2, '0')}
-                </div>
+            <div class="script-card">
+                <div class="script-number">${(index + 1).toString().padStart(2, '0')}</div>
 
-                <div class="relative z-10">
-                    <header class="mb-16 border-b border-zinc-800/50 pb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-                        <div>
-                            <div class="flex items-center gap-4 mb-4">
-                                <span class="w-12 h-12 rounded-2xl flex items-center justify-center text-black font-black italic text-xl" style="background-color: ${primaryColor}">
-                                    ${index + 1}
-                                </span>
-                                <h2 class="text-4xl md:text-5xl font-display font-black tracking-tight uppercase italic">${script.title}</h2>
-                            </div>
-                            <div class="flex flex-wrap gap-6 text-zinc-500">
-                                <div class="flex items-center gap-2">
-                                    <span class="w-1 h-1 bg-zinc-700 rounded-full"></span>
-                                    <span class="text-[10px] font-bold uppercase tracking-widest">Tema:</span>
-                                    <span class="text-zinc-300 font-medium">${script.theme}</span>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="w-1 h-1 bg-zinc-700 rounded-full"></span>
-                                    <span class="text-[10px] font-bold uppercase tracking-widest">Público:</span>
-                                    <span class="text-zinc-300 font-medium">${script.audience}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="glass px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-dbe-blue">
-                            Tonalidade: ${script.tone}
-                        </div>
+                <div class="relative">
+                    <header class="script-header">
+                        <div class="index-box">${index + 1}</div>
+                        <h2 class="script-title">${script.title}</h2>
                     </header>
 
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        <!-- Coluna Principal -->
-                        <div class="lg:col-span-7 space-y-8">
-                            <div class="glass p-8 rounded-[2rem] border-l-4 border-l-dbe-green transition-all hover:translate-x-1">
-                                <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-dbe-green mb-6 flex items-center gap-2">
-                                    <div class="w-2 h-2 bg-dbe-green rounded-full animate-pulse"></div>
-                                    Gancho (Hook)
-                                </h3>
-                                <p class="text-2xl font-display font-bold text-white leading-tight">
-                                    ${script.hook}
-                                </p>
+                    <div class="grid-container">
+                        <div class="flex flex-col gap-4">
+                            <div class="glass content-block hook-box">
+                                <span class="hook-label">Gancho (Hook)</span>
+                                <p class="hook-text">${script.hook}</p>
                             </div>
 
-                            <div class="glass p-8 rounded-[2rem] transition-all hover:translate-x-1">
-                                <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-500 mb-6">Desenvolvimento</h3>
-                                <div class="text-lg text-zinc-300 leading-relaxed font-medium">
-                                    ${script.development.split('\n').map(p => `<p class="mb-4">${p}</p>`).join('')}
+                            <div class="glass content-block">
+                                <span style="font-size: 0.7rem; font-weight: 900; text-transform: uppercase; color: #555; display: block; margin-bottom: 1rem;">Desenvolvimento</span>
+                                <div style="font-size: 1.1rem; color: #bbb;">
+                                    ${script.development.split('\n').map(p => `<p style="margin-bottom: 1rem;">${p}</p>`).join('')}
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Coluna CTA / Info -->
-                        <div class="lg:col-span-5 space-y-8">
-                            <div class="p-8 rounded-[2rem] text-black shadow-[0_20px_50px_rgba(0,144,208,0.2)] transition-all hover:-translate-y-1" style="background-color: ${primaryColor}">
-                                <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-black/50 mb-6">Call to Action</h3>
-                                <p class="text-3xl font-display font-black leading-none uppercase italic">
-                                    ${script.cta}
-                                </p>
+                        <div class="flex flex-col gap-4">
+                            <div class="cta-box">
+                                <span class="cta-label">Call to Action</span>
+                                <p class="cta-text">${script.cta}</p>
                             </div>
 
                             ${script.notes ? `
-                            <div class="glass p-8 rounded-[2rem] border-dashed border-zinc-800">
-                                <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600 mb-4 italic">Observações</h3>
-                                <p class="text-sm text-zinc-400 italic font-medium leading-relaxed">${script.notes}</p>
+                            <div class="glass content-block" style="border-style: dashed;">
+                                <span style="font-size: 0.7rem; font-weight: 900; text-transform: uppercase; color: #444; display: block; margin-bottom: 0.5rem; font-style: italic;">Observações</span>
+                                <p style="font-size: 0.9rem; color: #888; font-style: italic;">${script.notes}</p>
                             </div>` : ''}
 
                             ${script.referenceLink ? `
-                            <a href="${script.referenceLink}" target="_blank" class="block glass p-6 rounded-[1.5rem] border-zinc-800 hover:border-dbe-blue/50 transition-all group">
-                                <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600 mb-2">Referência</h3>
-                                <div class="text-xs text-dbe-blue font-bold truncate group-hover:underline">${script.referenceLink}</div>
-                            </a>` : ''}
+                            <div class="glass" style="padding: 1.5rem; border-radius: 1.5rem;">
+                                <span style="font-size: 0.7rem; font-weight: 900; text-transform: uppercase; color: #444; display: block; margin-bottom: 0.5rem;">Referência</span>
+                                <a href="${script.referenceLink}" target="_blank" style="color: ${primaryColor}; font-size: 0.75rem; text-decoration: none; font-weight: 700; word-break: break-all;">${script.referenceLink}</a>
+                            </div>` : ''}
                         </div>
                     </div>
                 </div>
@@ -349,17 +421,11 @@ const generateStandaloneHTML = (data: Presentation) => {
         `).join('')}
     </div>
 
-    <!-- Rodapé Premium -->
-    <footer class="py-32 px-8 text-center border-t border-zinc-900 relative overflow-hidden">
-        <div class="absolute inset-0 bg-dbe-blue/5 blur-[120px] rounded-full -bottom-1/2"></div>
-        <div class="relative z-10">
-            <div class="mb-6 opacity-30">
-                <div class="w-10 h-10 rounded-lg bg-white mx-auto"></div>
-            </div>
-            <p class="text-[10px] font-black uppercase tracking-[0.5em] text-zinc-600">
-                Dos Bastidores ao Espetáculo &copy; 2026
-            </p>
-        </div>
+    <!-- Rodapé -->
+    <footer style="padding: 8rem 2rem; text-align: center; border-top: 1px solid #111;">
+        <p style="font-size: 10px; font-weight: 900; letter-spacing: 0.5em; color: #333; text-transform: uppercase;">
+            Dos Bastidores ao Espetáculo &copy; 2026
+        </p>
     </footer>
 </body>
 </html>
