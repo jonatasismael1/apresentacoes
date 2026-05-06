@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStorage } from '../hooks/useStorage';
-import { useToast } from '../components/Toast';
+import { useToast } from '../components/toastContext';
 import type { Presentation, Script } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   ArrowLeft, Save, Plus, Trash2, 
-  Copy, Layout, Eye, Settings, GripVertical, FileText
+  Copy, Layout, Eye, Settings, GripVertical, FileText, ChevronDown, ChevronRight,
+  CheckCircle, AlertTriangle, BookOpen, UserPlus, History
 } from 'lucide-react';
 import LogoUpload from '../components/LogoUpload';
 import PresentationPreview from '../components/PresentationPreview';
@@ -14,11 +15,19 @@ import BulkImportModal from '../components/BulkImportModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
+import { SCRIPT_TEMPLATES } from '../constants/scriptTemplates';
 
 const Editor: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { getPresentation, savePresentation, savePresentationLocal } = useStorage();
+  const {
+    presentations,
+    clientProfiles,
+    getPresentation,
+    savePresentation,
+    savePresentationLocal,
+    createClientProfileFromPresentation,
+  } = useStorage();
   const { showToast } = useToast();
   const hasLoaded = useRef(false);
 
@@ -34,42 +43,68 @@ const Editor: React.FC = () => {
     date: new Date().toLocaleDateString('pt-BR'),
     scripts: [],
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    approvalStatus: 'draft',
+    comments: [],
+    history: [],
   });
 
   const [activeTab, setActiveTab] = useState<'dados' | 'roteiros'>('dados');
   const [showPreview, setShowPreview] = useState(true);
   const [showBulkImport, setShowBulkImport] = useState(false);
 
-  const [isSaving, setIsSaving] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'local' | 'syncing' | 'synced'>('idle');
+  const [collapsedScripts, setCollapsedScripts] = useState<Set<string>>(new Set());
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
 
   useEffect(() => {
     if (id && !hasLoaded.current) {
       const existing = getPresentation(id);
       if (existing) {
-        setFormData(existing);
-        hasLoaded.current = true;
-        setIsLoading(false);
-      } else if (getPresentation.length > 0) {
+        const loadTimer = window.setTimeout(() => {
+          setFormData(existing);
+          hasLoaded.current = true;
+          setIsLoading(false);
+        }, 0);
+        return () => window.clearTimeout(loadTimer);
+      } else if (presentations.length > 0) {
         // Se a lista já carregou e não achou, para de carregar
-        setIsLoading(false);
+        const stopTimer = window.setTimeout(() => setIsLoading(false), 0);
+        return () => window.clearTimeout(stopTimer);
       }
     } else {
-      setIsLoading(false);
+      const newTimer = window.setTimeout(() => {
+        setIsLoading(false);
+        hasLoaded.current = true;
+      }, 0);
+      return () => window.clearTimeout(newTimer);
     }
-  }, [id, getPresentation]);
+  }, [id, getPresentation, presentations.length]);
 
   // Auto-save debounce effect
   useEffect(() => {
     if (!hasLoaded.current || isLoading) return; // Only auto-save after initial load
 
     const timer = setTimeout(() => {
-      setIsSaving(true);
+      setSaveState('local');
       savePresentationLocal(formData);
-      setTimeout(() => setIsSaving(false), 800); // Visual cue duration
+      setTimeout(() => setSaveState('synced'), 800);
     }, 1500);
 
     return () => clearTimeout(timer);
   }, [formData, savePresentationLocal, isLoading]);
+
+  const validation = {
+    clientName: !formData.clientName.trim(),
+    title: !formData.title.trim(),
+  };
+  const missingFields = [
+    validation.clientName ? 'cliente' : '',
+    validation.title ? 'título' : '',
+    !formData.objective.trim() ? 'objetivo' : '',
+    formData.scripts.length === 0 ? 'roteiros' : '',
+  ].filter(Boolean);
+  const completedItems = 4 - missingFields.length;
 
   if (isLoading) {
     return (
@@ -89,7 +124,10 @@ const Editor: React.FC = () => {
       showToast('Nome do cliente e título são obrigatórios', 'error');
       return;
     }
-    savePresentation(formData);
+    setSaveState('syncing');
+    const saved = savePresentation(formData);
+    setFormData(saved);
+    setTimeout(() => setSaveState('synced'), 1000);
     showToast('Salvo localmente. Sincronização enviada!', 'success');
     if (!id) navigate(`/editar/${formData.id}`);
   };
@@ -113,6 +151,16 @@ const Editor: React.FC = () => {
     }));
     setActiveTab('roteiros');
     showToast('Roteiro adicionado', 'info');
+  };
+
+  const addScriptFromTemplate = () => {
+    const template = SCRIPT_TEMPLATES.find(item => item.id === selectedTemplateId);
+    if (!template) return;
+    const newScript: Script = { ...template.script, id: uuidv4() };
+    setFormData(prev => ({ ...prev, scripts: [...prev.scripts, newScript] }));
+    setSelectedTemplateId('');
+    setActiveTab('roteiros');
+    showToast(`Template "${template.name}" adicionado`, 'success');
   };
 
   const updateScript = (scriptId: string, updates: Partial<Script>) => {
@@ -151,6 +199,39 @@ const Editor: React.FC = () => {
     showToast('Roteiro duplicado', 'info');
   };
 
+  const toggleScriptCollapsed = (scriptId: string) => {
+    setCollapsedScripts(prev => {
+      const next = new Set(prev);
+      if (next.has(scriptId)) next.delete(scriptId);
+      else next.add(scriptId);
+      return next;
+    });
+  };
+
+  const applyClientProfile = (profileId: string) => {
+    const profile = clientProfiles.find(item => item.id === profileId);
+    if (!profile) return;
+    setFormData(prev => ({
+      ...prev,
+      clientProfileId: profile.id,
+      clientName: profile.name,
+      clientSegment: profile.segment,
+      clientLogo: profile.logo || prev.clientLogo,
+      primaryColor: profile.primaryColor || prev.primaryColor,
+      secondaryColor: profile.secondaryColor || prev.secondaryColor,
+    }));
+  };
+
+  const saveClientProfile = () => {
+    if (!formData.clientName.trim()) {
+      showToast('Informe o nome do cliente antes de salvar o perfil.', 'error');
+      return;
+    }
+    const profile = createClientProfileFromPresentation(formData);
+    setFormData(prev => ({ ...prev, clientProfileId: profile.id }));
+    showToast('Perfil de cliente salvo.', 'success');
+  };
+
   const handleBulkImport = (newScripts: Script[]) => {
     setFormData(prev => ({
       ...prev,
@@ -170,9 +251,12 @@ const Editor: React.FC = () => {
           <h1 className="font-bold hidden md:block">
             {id ? 'Editar Apresentação' : 'Nova Apresentação'}
           </h1>
-          {isSaving && (
-            <span className="text-xs font-bold text-dbe-blue ml-2 animate-pulse bg-dbe-blue/10 px-2 py-1 rounded">
-              Salvando...
+          {saveState !== 'idle' && (
+            <span className="text-xs font-bold text-dbe-blue ml-2 bg-dbe-blue/10 px-2 py-1 rounded flex items-center gap-1">
+              {saveState === 'synced' ? <CheckCircle size={12} /> : <RefreshDot />}
+              {saveState === 'local' && 'Salvo localmente'}
+              {saveState === 'syncing' && 'Sincronizando'}
+              {saveState === 'synced' && 'Sincronizado'}
             </span>
           )}
         </div>
@@ -217,6 +301,41 @@ const Editor: React.FC = () => {
           <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
             {activeTab === 'dados' ? (
               <div className="space-y-6">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2 text-sm font-bold">
+                      {missingFields.length === 0 ? <CheckCircle size={16} className="text-dbe-green" /> : <AlertTriangle size={16} className="text-yellow-400" />}
+                      Progresso da apresentação
+                    </div>
+                    <span className="text-xs text-zinc-500">{completedItems}/4</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+                    <div className="h-full bg-dbe-blue transition-all" style={{ width: `${(completedItems / 4) * 100}%` }} />
+                  </div>
+                  {missingFields.length > 0 && (
+                    <p className="text-xs text-zinc-500 mt-2">Faltando: {missingFields.join(', ')}.</p>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <label className="label">Perfil do cliente</label>
+                  <div className="flex gap-2">
+                    <select
+                      value={formData.clientProfileId || ''}
+                      onChange={event => applyClientProfile(event.target.value)}
+                      className="input-field flex-1"
+                    >
+                      <option value="">Selecionar perfil salvo...</option>
+                      {clientProfiles.map(profile => (
+                        <option key={profile.id} value={profile.id}>{profile.name}</option>
+                      ))}
+                    </select>
+                    <button onClick={saveClientProfile} className="btn-secondary px-3" title="Salvar perfil do cliente">
+                      <UserPlus size={16} />
+                    </button>
+                  </div>
+                </div>
+
                 <div className="space-y-4">
                   <label className="label">Logo do Cliente (Opcional)</label>
                   <LogoUpload 
@@ -233,9 +352,10 @@ const Editor: React.FC = () => {
                       name="clientName"
                       value={formData.clientName}
                       onChange={handleInputChange}
-                      className="input-field"
+                      className={`input-field ${validation.clientName ? 'border-red-500/50' : ''}`}
                       placeholder="Ex: Coca-Cola"
                     />
+                    {validation.clientName && <p className="text-xs text-red-400 mt-1">Nome do cliente é obrigatório.</p>}
                   </div>
                   <div className="group">
                     <label className="label">Segmento</label>
@@ -253,9 +373,10 @@ const Editor: React.FC = () => {
                       name="title"
                       value={formData.title}
                       onChange={handleInputChange}
-                      className="input-field"
+                      className={`input-field ${validation.title ? 'border-red-500/50' : ''}`}
                       placeholder="Ex: Campanha Verão 2026"
                     />
+                    {validation.title && <p className="text-xs text-red-400 mt-1">Título é obrigatório.</p>}
                   </div>
                   <div className="group">
                     <label className="label">Objetivo da Campanha</label>
@@ -317,10 +438,66 @@ const Editor: React.FC = () => {
                       />
                     </div>
                   </div>
+                  {formData.history && formData.history.length > 0 && (
+                    <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+                      <div className="flex items-center gap-2 text-sm font-bold mb-3">
+                        <History size={16} className="text-dbe-blue" />
+                        Histórico de versões
+                      </div>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {formData.history.slice(0, 6).map(version => (
+                          <div key={version.id} className="flex items-center justify-between text-xs border border-zinc-800 rounded-lg p-2">
+                            <span className="text-zinc-300">{version.label}</span>
+                            <span className="text-zinc-500">{new Date(version.createdAt).toLocaleString('pt-BR')}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
               <div className="space-y-6">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-bold">
+                    <BookOpen size={16} className="text-dbe-blue" />
+                    Biblioteca de templates
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      value={selectedTemplateId}
+                      onChange={event => setSelectedTemplateId(event.target.value)}
+                      className="input-field flex-1"
+                    >
+                      <option value="">Escolher template...</option>
+                      {SCRIPT_TEMPLATES.map(template => (
+                        <option key={template.id} value={template.id}>{template.name}</option>
+                      ))}
+                    </select>
+                    <button onClick={addScriptFromTemplate} disabled={!selectedTemplateId} className="btn-secondary px-3">
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                {formData.scripts.length > 0 && (
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
+                    <p className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Navegação dos roteiros</p>
+                    <div className="space-y-1 max-h-44 overflow-y-auto">
+                      {formData.scripts.map((script, index) => (
+                        <button
+                          key={script.id}
+                          onClick={() => toggleScriptCollapsed(script.id)}
+                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-zinc-900 text-xs text-zinc-300 flex items-center justify-between"
+                        >
+                          <span className="truncate">{index + 1}. {script.title || 'Sem título'}</span>
+                          {collapsedScripts.has(script.id) ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <button onClick={addScript} className="btn-secondary w-full py-3 border-dashed border-2 border-zinc-800 bg-transparent hover:bg-zinc-900">
                   <Plus size={18} />
                   Adicionar Roteiro
@@ -353,12 +530,15 @@ const Editor: React.FC = () => {
                                       <span className="text-xs font-bold bg-zinc-800 px-2 py-1 rounded text-zinc-400">#{index + 1}</span>
                                     </div>
                                     <div className="flex gap-1">
+                                      <button onClick={() => toggleScriptCollapsed(script.id)} className="btn-ghost p-1">
+                                        {collapsedScripts.has(script.id) ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                                      </button>
                                       <button onClick={() => duplicateScript(script)} className="btn-ghost p-1"><Copy size={14} /></button>
                                       <button onClick={() => deleteScript(script.id)} className="btn-ghost p-1 hover:text-red-500"><Trash2 size={14} /></button>
                                     </div>
                                   </div>
 
-                                  <div className="space-y-3">
+                                  {!collapsedScripts.has(script.id) && <div className="space-y-3">
                                     <input 
                                       placeholder="Título do roteiro" 
                                       className="input-field py-1 px-2 text-sm font-bold"
@@ -409,7 +589,7 @@ const Editor: React.FC = () => {
                                       value={script.referenceLink || ''}
                                       onChange={(e) => updateScript(script.id, { referenceLink: e.target.value })}
                                     />
-                                  </div>
+                                  </div>}
                                 </motion.div>
                               )}
                             </Draggable>
@@ -466,9 +646,14 @@ const Editor: React.FC = () => {
         isOpen={showBulkImport} 
         onClose={() => setShowBulkImport(false)} 
         onImport={handleBulkImport} 
+        templates={SCRIPT_TEMPLATES}
       />
     </div>
   );
 };
+
+function RefreshDot() {
+  return <span className="w-2 h-2 rounded-full bg-dbe-blue animate-pulse" />;
+}
 
 export default Editor;

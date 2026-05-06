@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   X, Play, Pause, RotateCcw, Plus, Minus, 
-  Maximize2, Minimize2, FlipHorizontal, Eye, EyeOff, Smartphone, Bug
+  Maximize2, Minimize2, FlipHorizontal, Eye, EyeOff, Smartphone, Bug, FlaskConical
 } from 'lucide-react';
 import type { TeleprompterSettings } from '../../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,36 +20,59 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
   const [showControls, setShowControls] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isRotatedCSS, setIsRotatedCSS] = useState(false);
+  const [isRehearsalMode, setIsRehearsalMode] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [debugLog, setDebugLog] = useState<KeyDebugInfo[]>([]);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [maxScroll, setMaxScroll] = useState(1);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<number>(0);
   const lastTimeRef = useRef<number | null>(null);
-
-  // ─── Animation Loop ─────────────────────────────────────────────────────────
-  const animate = useCallback((time: number) => {
-    if (lastTimeRef.current !== null && isPlaying) {
-      const deltaTime = time - lastTimeRef.current;
-      const pixelsPerMs = (settings.speed * 50) / 1000;
-      setScrollPos(prev => prev + pixelsPerMs * deltaTime);
-    }
-    lastTimeRef.current = time;
-    requestRef.current = requestAnimationFrame(animate);
-  }, [isPlaying, settings.speed]);
+  const countdownRef = useRef<number | null>(null);
+  const effectiveFontSize = isRehearsalMode ? Math.max(24, Math.round(settings.fontSize * 0.72)) : settings.fontSize;
+  const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+  const estimatedMinutes = Math.max(1, Math.ceil(wordCount / Math.max(90, 150 * Math.max(settings.speed, 0.5))));
+  const progress = Math.min(100, Math.max(0, (scrollPos / maxScroll) * 100));
 
   useEffect(() => {
+    const updateMaxScroll = () => {
+      const contentHeight = scrollRef.current?.scrollHeight || 1;
+      setMaxScroll(Math.max(1, contentHeight - window.innerHeight));
+    };
+    updateMaxScroll();
+    window.addEventListener('resize', updateMaxScroll);
+    return () => window.removeEventListener('resize', updateMaxScroll);
+  }, [text, settings.width, settings.fontSize, settings.lineHeight, isRehearsalMode]);
+
+  useEffect(() => {
+    const animate = (time: number) => {
+      if (lastTimeRef.current !== null && isPlaying) {
+        const deltaTime = time - lastTimeRef.current;
+        const pixelsPerMs = (settings.speed * 50) / 1000;
+        setScrollPos(prev => prev + pixelsPerMs * deltaTime);
+      }
+      lastTimeRef.current = time;
+      requestRef.current = requestAnimationFrame(animate);
+    };
+
     lastTimeRef.current = null;
     requestRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(requestRef.current);
-  }, [animate, isPlaying]);
+  }, [isPlaying, settings.speed]);
 
   // Ref estável para o estado de reprodução (evita recriar callbacks)
   const isPlayingRef = useRef(isPlaying);
-  isPlayingRef.current = isPlaying;
   const settingsRef = useRef(settings);
-  settingsRef.current = settings;
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   // ─── Handlers para o controle Bluetooth ─────────────────────────────────────
   // Ação de RECUA (Seta pra cima, Esquerda, Volume +, etc)
@@ -83,9 +106,43 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
   }, [updateSettings]);
 
   // Enter / Space / MediaPlayPause → play/pause
-  const handleTogglePlay = useCallback(() => {
-    setIsPlaying(p => !p);
+  const cancelCountdown = useCallback(() => {
+    if (countdownRef.current !== null) {
+      window.clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    setCountdown(null);
   }, []);
+
+  const handleTogglePlay = useCallback(() => {
+    if (countdown !== null) {
+      cancelCountdown();
+      return;
+    }
+
+    if (isPlayingRef.current) {
+      setIsPlaying(false);
+      return;
+    }
+
+    setCountdown(3);
+    countdownRef.current = window.setInterval(() => {
+      setCountdown(prev => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          if (countdownRef.current !== null) {
+            window.clearInterval(countdownRef.current);
+            countdownRef.current = null;
+          }
+          setIsPlaying(true);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 700);
+  }, [cancelCountdown, countdown]);
+
+  useEffect(() => () => cancelCountdown(), [cancelCountdown]);
 
   // Debug
   const handleKeyDebug = useCallback((info: KeyDebugInfo) => {
@@ -110,13 +167,18 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
       if (!document.fullscreenElement) {
         await document.documentElement.requestFullscreen();
         setIsFullscreen(true);
-        if (screen.orientation && (screen.orientation as any).lock) {
-          try { await (screen.orientation as any).lock('landscape'); } catch {}
+        const orientation = screen.orientation as ScreenOrientation & {
+          lock?: (orientation: OrientationLockType) => Promise<void>;
+        };
+        if (orientation.lock) {
+          try { await orientation.lock('landscape'); } catch {
+            // Some mobile browsers expose the API but block locking.
+          }
         }
       } else {
         await document.exitFullscreen();
         setIsFullscreen(false);
-        if (screen.orientation && (screen.orientation as any).unlock) {
+        if (screen.orientation && screen.orientation.unlock) {
           screen.orientation.unlock();
         }
       }
@@ -171,6 +233,30 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
         } : {})
       }}
     >
+      <div className="absolute top-0 left-0 right-0 h-1 bg-zinc-900 z-20">
+        <div className="h-full bg-dbe-blue transition-all" style={{ width: `${progress}%` }} />
+      </div>
+
+      <div className="absolute top-4 left-4 z-20 flex gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+        <span className="px-3 py-1 rounded-full bg-zinc-900/70 border border-zinc-800 backdrop-blur">
+          {estimatedMinutes} min estimado
+        </span>
+        <span className="px-3 py-1 rounded-full bg-zinc-900/70 border border-zinc-800 backdrop-blur">
+          {Math.round(progress)}%
+        </span>
+        {isRehearsalMode && (
+          <span className="px-3 py-1 rounded-full bg-dbe-blue/20 text-dbe-blue border border-dbe-blue/30 backdrop-blur">
+            Ensaio
+          </span>
+        )}
+      </div>
+
+      {countdown !== null && (
+        <div className="absolute inset-0 z-40 bg-black/65 backdrop-blur-sm flex items-center justify-center">
+          <div className="text-8xl font-black text-white tabular-nums">{countdown}</div>
+        </div>
+      )}
+
       {/* Guia de Leitura Central */}
       <div className="absolute top-1/2 left-0 w-full h-1 bg-dbe-blue/30 -translate-y-1/2 z-10 pointer-events-none" />
       <div className="absolute top-1/2 left-2 -translate-y-1/2 z-10 pointer-events-none">
@@ -182,7 +268,7 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
         className="flex-1 flex flex-col items-center overflow-hidden cursor-pointer touch-none"
         onClick={() => {
           if (touchStartY.current === null) {
-            setIsPlaying(!isPlaying);
+            handleTogglePlay();
           }
         }}
         onTouchStart={handleTouchStart}
@@ -193,7 +279,7 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
           ref={scrollRef}
           style={{ 
             width: `${settings.width}%`,
-            fontSize: `${settings.fontSize}px`,
+            fontSize: `${effectiveFontSize}px`,
             lineHeight: settings.lineHeight,
             transform: `translateY(${-scrollPos}px) ${settings.isMirrored ? 'scaleX(-1)' : ''}`,
             paddingTop: '50vh',
@@ -325,7 +411,7 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
 
       {/* Controles Flutuantes */}
       <AnimatePresence>
-        {showControls && (
+        {(showControls || isRehearsalMode) && (
           <motion.div 
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -367,6 +453,14 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
               </button>
 
               <div className="w-[1px] h-6 sm:h-8 bg-zinc-800 mx-0.5" />
+
+              <button
+                onClick={() => setIsRehearsalMode(prev => !prev)}
+                className={`p-2 sm:p-3 rounded-full transition-colors ${isRehearsalMode ? 'text-dbe-green bg-dbe-green/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
+                title="Modo ensaio"
+              >
+                <FlaskConical size={18} />
+              </button>
 
               <button 
                 onClick={() => updateSettings({ isMirrored: !settings.isMirrored })}
@@ -410,7 +504,7 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
             </div>
 
             <div className="px-3 py-1 bg-black/60 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-zinc-400 border border-zinc-800 backdrop-blur-sm">
-              {settings.speed.toFixed(1)}x | {settings.fontSize}px
+              {settings.speed.toFixed(1)}x | {effectiveFontSize}px | {estimatedMinutes} min
               {isPlaying && <span className="ml-2 text-amber-400 animate-pulse">● REPRODUZINDO</span>}
             </div>
           </motion.div>

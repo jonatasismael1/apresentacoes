@@ -5,7 +5,7 @@ interface SyncDB extends DBSchema {
     key: string;
     value: {
       id: string; // uuid
-      payload: any;
+      payload: unknown;
       type: 'save' | 'delete';
       timestamp: number;
     };
@@ -24,7 +24,7 @@ async function initDB() {
   });
 }
 
-export async function addToQueue(type: 'save' | 'delete', payload: any) {
+export async function addToQueue(type: 'save' | 'delete', payload: unknown) {
   const db = await initDB();
   const id = crypto.randomUUID();
   await db.put('sync_queue', {

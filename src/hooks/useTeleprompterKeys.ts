@@ -112,10 +112,16 @@ export function useTeleprompterKeys(options: UseTeleprompterKeysOptions) {
     onTogglePlayPause,
     onKeyDebug,
   });
-  cbRef.current = { onActionBackward, onActionForward, onTogglePlayPause, onKeyDebug };
 
   const activeRef = useRef(active);
-  activeRef.current = active;
+
+  useEffect(() => {
+    cbRef.current = { onActionBackward, onActionForward, onTogglePlayPause, onKeyDebug };
+  }, [onActionBackward, onActionForward, onTogglePlayPause, onKeyDebug]);
+
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
 
   const triggerAction = useCallback((action: TeleprompterAction) => {
     switch (action) {

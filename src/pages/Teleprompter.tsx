@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStorage } from '../hooks/useStorage';
-import { useToast } from '../components/Toast';
+import { useToast } from '../components/toastContext';
 import { 
   ArrowLeft, Play, Settings as SettingsIcon, 
-  FlipHorizontal, Sun, Moon, Layout
+  FlipHorizontal, Sun, Moon, Layout, Save
 } from 'lucide-react';
 import type { TeleprompterSettings } from '../types';
 import DBELogo from '../components/DBELogo';
@@ -28,6 +28,11 @@ const PRESETS = {
   podcast: { speed: 1.2, fontSize: 38, lineHeight: 1.8 },
 };
 
+interface CustomPreset {
+  name: string;
+  settings: TeleprompterSettings;
+}
+
 const Teleprompter: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -41,6 +46,15 @@ const Teleprompter: React.FC = () => {
     const stored = localStorage.getItem('dbe_tp_settings');
     return stored ? JSON.parse(stored) : DEFAULT_SETTINGS;
   });
+  const [customPresets, setCustomPresets] = useState<CustomPreset[]>(() => {
+    try {
+      const stored = localStorage.getItem('dbe_tp_custom_presets');
+      return stored ? JSON.parse(stored) as CustomPreset[] : [];
+    } catch {
+      return [];
+    }
+  });
+  const [presetName, setPresetName] = useState('');
 
   const presentation = presentations.find(p => p.id === selectedPresentationId);
 
@@ -60,6 +74,20 @@ const Teleprompter: React.FC = () => {
   const applyPreset = (preset: keyof typeof PRESETS) => {
     setSettings(prev => ({ ...prev, ...PRESETS[preset] }));
     showToast(`Preset "${preset}" aplicado`, 'success');
+  };
+
+  const saveCustomPreset = () => {
+    const name = presetName.trim() || `Preset ${customPresets.length + 1}`;
+    const next = [{ name, settings }, ...customPresets.filter(item => item.name !== name)].slice(0, 8);
+    setCustomPresets(next);
+    localStorage.setItem('dbe_tp_custom_presets', JSON.stringify(next));
+    setPresetName('');
+    showToast(`Preset "${name}" salvo`, 'success');
+  };
+
+  const applyCustomPreset = (preset: CustomPreset) => {
+    setSettings(preset.settings);
+    showToast(`Preset "${preset.name}" aplicado`, 'success');
   };
 
   if (isStarted && presentation) {
@@ -148,16 +176,44 @@ const Teleprompter: React.FC = () => {
               <div>
                 <label className="label mb-3">Presets Rápidos</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {Object.keys(PRESETS).map((p) => (
+                  {(Object.keys(PRESETS) as Array<keyof typeof PRESETS>).map((p) => (
                     <button 
                       key={p} 
-                      onClick={() => applyPreset(p as any)}
+                      onClick={() => applyPreset(p)}
                       className="text-xs py-2 bg-zinc-800 hover:bg-dbe-blue/20 border border-zinc-700 rounded-md uppercase font-bold tracking-wider transition-colors"
                     >
                       {p}
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="label">Presets salvos</label>
+                <div className="flex gap-2">
+                  <input
+                    value={presetName}
+                    onChange={event => setPresetName(event.target.value)}
+                    className="input-field text-sm"
+                    placeholder="Nome do preset"
+                  />
+                  <button onClick={saveCustomPreset} className="btn-secondary px-3">
+                    <Save size={16} />
+                  </button>
+                </div>
+                {customPresets.length > 0 && (
+                  <div className="grid grid-cols-1 gap-2">
+                    {customPresets.map(preset => (
+                      <button
+                        key={preset.name}
+                        onClick={() => applyCustomPreset(preset)}
+                        className="text-left text-xs py-2 px-3 bg-zinc-800 hover:bg-dbe-blue/20 border border-zinc-700 rounded-md font-bold transition-colors"
+                      >
+                        {preset.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">
