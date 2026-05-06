@@ -22,16 +22,10 @@ import {
 import { motion } from 'framer-motion';
 import DBELogo from '../components/DBELogo';
 import type { ApprovalStatus, Presentation, SyncStatus } from '../types';
+import { PRESENTATION_STATUSES, PRESENTATION_STATUS_LABELS } from '../constants/presentationStatus';
 
 type ViewMode = 'cards' | 'table';
 type DashboardTab = 'active' | 'archived';
-
-const APPROVAL_LABELS: Record<ApprovalStatus, string> = {
-  draft: 'Rascunho',
-  sent: 'Enviado',
-  approved: 'Aprovado',
-  changes_requested: 'Ajustes',
-};
 
 const SYNC_LABELS: Record<SyncStatus, string> = {
   local: 'Local',
@@ -49,6 +43,7 @@ const Dashboard: React.FC = () => {
     restorePresentation,
     deletePresentation,
     duplicatePresentation,
+    updateApprovalStatus,
     isLoading,
     syncError,
     syncStatusById,
@@ -100,10 +95,10 @@ const Dashboard: React.FC = () => {
     showToast('Apresentação restaurada.', 'success');
   };
 
-  const handleDuplicate = (id: string, sameClientOnly = false) => {
-    const newId = duplicatePresentation(id, sameClientOnly);
+  const handleDuplicate = (id: string) => {
+    const newId = duplicatePresentation(id);
     if (newId) {
-      showToast(sameClientOnly ? 'Novo projeto criado para o mesmo cliente.' : 'Apresentação duplicada.', 'success');
+      showToast('Apresentação duplicada.', 'success');
     }
   };
 
@@ -115,10 +110,10 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen p-5 md:p-10 max-w-7xl mx-auto">
-      <header className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 mb-8">
+    <div className="min-h-screen p-3 md:p-10 max-w-7xl mx-auto">
+      <header className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 mb-5 md:mb-8">
         <div>
-          <DBELogo className="h-16 mb-4" />
+          <DBELogo className="h-11 md:h-16 mb-3 md:mb-4" />
           <div className="flex flex-wrap items-center gap-3">
             <p className="text-zinc-400 text-sm">Gerencie roteiros, clientes e entregas.</p>
             {isLoading ? (
@@ -138,7 +133,7 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           <button onClick={() => navigate('/teleprompter-rapido')} className="btn-secondary border border-dbe-blue/30 text-dbe-blue hover:bg-dbe-blue/10 text-sm px-3 py-2">
             <Zap size={16} fill="currentColor" />
             <span className="hidden sm:inline">Teleprompter rápido</span>
@@ -232,7 +227,7 @@ const Dashboard: React.FC = () => {
               onEdit={() => navigate(`/editar/${presentation.id}`)}
               onTeleprompter={() => navigate(`/teleprompter/${presentation.id}`)}
               onDuplicate={() => handleDuplicate(presentation.id)}
-              onSameClient={() => handleDuplicate(presentation.id, true)}
+              onStatusChange={status => updateApprovalStatus(presentation.id, status)}
               onArchive={() => handleArchive(presentation)}
               onRestore={() => restorePresentation(presentation.id)}
               onDelete={() => setDeleteCandidate(presentation)}
@@ -303,7 +298,7 @@ interface PresentationCardProps {
   onEdit: () => void;
   onTeleprompter: () => void;
   onDuplicate: () => void;
-  onSameClient: () => void;
+  onStatusChange: (status: ApprovalStatus) => void;
   onArchive: () => void;
   onRestore: () => void;
   onDelete: () => void;
@@ -317,7 +312,7 @@ function PresentationCard({
   onEdit,
   onTeleprompter,
   onDuplicate,
-  onSameClient,
+  onStatusChange,
   onArchive,
   onRestore,
   onDelete,
@@ -349,6 +344,19 @@ function PresentationCard({
           <Metric label="Criado" value={formatDate(presentation.createdAt)} />
         </div>
 
+        <label className="block mb-3">
+          <span className="text-[10px] uppercase tracking-wider text-zinc-600 font-bold">Status</span>
+          <select
+            value={presentation.approvalStatus || 'sent'}
+            onChange={event => onStatusChange(event.target.value as ApprovalStatus)}
+            className="input-field mt-1 py-2 text-xs"
+          >
+            {PRESENTATION_STATUSES.map(status => (
+              <option key={status.value} value={status.value}>{status.label}</option>
+            ))}
+          </select>
+        </label>
+
         <div className="grid grid-cols-2 gap-2 mb-3">
           <button onClick={onView} className="btn-secondary py-2 text-xs">
             <Eye size={14} />
@@ -360,29 +368,37 @@ function PresentationCard({
           </button>
         </div>
 
-        <div className="flex items-center gap-1">
-          <button onClick={onTeleprompter} className="btn-ghost p-2 border border-zinc-800 flex-1" title="Teleprompter">
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={onTeleprompter} className="btn-ghost px-2 py-2 border border-zinc-800 text-[11px]" title="Teleprompter">
             <Monitor size={14} />
+            <span>Teleprompter</span>
           </button>
-          <button onClick={onDuplicate} className="btn-ghost p-2 border border-zinc-800 flex-1" title="Duplicar">
+          <button onClick={onDuplicate} className="btn-ghost px-2 py-2 border border-zinc-800 text-[11px]" title="Duplicar">
             <Copy size={14} />
-          </button>
-          <button onClick={onSameClient} className="btn-ghost p-2 border border-zinc-800 flex-1" title="Novo projeto para o mesmo cliente">
-            <FileText size={14} />
+            <span>Duplicar</span>
           </button>
           {presentation.archivedAt ? (
             <>
-              <button onClick={onRestore} className="btn-ghost p-2 border border-zinc-800 flex-1 text-dbe-green" title="Restaurar">
+              <button onClick={onRestore} className="btn-ghost px-2 py-2 border border-zinc-800 text-[11px] text-dbe-green" title="Restaurar">
                 <ArchiveRestore size={14} />
+                <span>Restaurar</span>
               </button>
-              <button onClick={onDelete} className="btn-ghost p-2 border border-zinc-800 flex-1 hover:text-red-400" title="Excluir definitivamente">
+              <button onClick={onDelete} className="btn-ghost px-2 py-2 border border-zinc-800 text-[11px] hover:text-red-400" title="Excluir definitivamente">
                 <Trash2 size={14} />
+                <span>Excluir</span>
               </button>
             </>
           ) : (
-            <button onClick={onArchive} className="btn-ghost p-2 border border-zinc-800 flex-1" title="Arquivar">
-              <Archive size={14} />
-            </button>
+            <>
+              <button onClick={onDelete} className="btn-ghost px-2 py-2 border border-zinc-800 text-[11px] hover:text-red-400" title="Excluir">
+                <Trash2 size={14} />
+                <span>Excluir</span>
+              </button>
+              <button onClick={onArchive} className="btn-ghost px-2 py-2 border border-zinc-800 text-[11px]" title="Arquivar">
+                <Archive size={14} />
+                <span>Arquivar</span>
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -446,11 +462,11 @@ function PresentationTable({
 }
 
 function StatusBadges({ presentation, syncStatus }: { presentation: Presentation; syncStatus?: SyncStatus }) {
-  const approval = presentation.approvalStatus || 'draft';
+  const approval = presentation.approvalStatus || 'sent';
   return (
     <div className="flex flex-col items-end gap-1">
       <span className="text-[10px] px-2 py-1 rounded-full bg-zinc-800 text-zinc-300 font-bold">
-        {APPROVAL_LABELS[approval]}
+        {PRESENTATION_STATUS_LABELS[approval]}
       </span>
       {syncStatus && (
         <span className="text-[10px] px-2 py-1 rounded-full bg-dbe-blue/10 text-dbe-blue font-bold">

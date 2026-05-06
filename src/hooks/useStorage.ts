@@ -9,6 +9,7 @@ import type {
 } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { addToQueue, getQueue, removeFromQueue } from '../lib/syncQueue';
+import { normalizeApprovalStatus, type LegacyApprovalStatus } from '../constants/presentationStatus';
 
 const STORAGE_KEY = 'dbe_apresentacoes';
 const CLIENT_PROFILES_KEY = 'dbe_client_profiles';
@@ -39,10 +40,24 @@ const normalizePresentation = (presentation: Presentation): Presentation => {
     scripts: presentation.scripts ?? [],
     createdAt: presentation.createdAt || now,
     updatedAt: presentation.updatedAt || presentation.createdAt || now,
-    approvalStatus: presentation.approvalStatus || 'draft',
+    approvalStatus: normalizeApprovalStatus(presentation.approvalStatus as LegacyApprovalStatus),
     comments: presentation.comments || [],
     history: presentation.history || [],
   };
+};
+
+const applyStatusToPresentation = (presentation: Presentation, approvalStatus: ApprovalStatus): Presentation => {
+  const next: Presentation = { ...presentation, approvalStatus };
+  if (approvalStatus === 'finalized') {
+    return {
+      ...next,
+      archivedAt: presentation.archivedAt || new Date().toISOString(),
+    };
+  }
+
+  const { archivedAt: _archivedAt, ...activePresentation } = next;
+  void _archivedAt;
+  return activePresentation;
 };
 
 const createHistoryEntry = (presentation: Presentation, label: string): PresentationVersion => {
@@ -279,7 +294,7 @@ export const useStorage = () => {
     let archived: Presentation | undefined;
     setAndPersistPresentations(prev => prev.map(item => {
       if (item.id !== id) return item;
-      archived = { ...touchPresentation(item), archivedAt };
+      archived = { ...touchPresentation(item), archivedAt, approvalStatus: 'finalized' };
       return archived;
     }));
     if (archived) {
@@ -294,7 +309,7 @@ export const useStorage = () => {
       if (item.id !== id) return item;
       const { archivedAt: _archivedAt, ...rest } = item;
       void _archivedAt;
-      restored = touchPresentation(rest);
+      restored = touchPresentation({ ...rest, approvalStatus: normalizeApprovalStatus(rest.approvalStatus) === 'finalized' ? 'sent' : normalizeApprovalStatus(rest.approvalStatus) });
       return restored;
     }));
     if (restored) {
@@ -321,7 +336,7 @@ export const useStorage = () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       archivedAt: undefined,
-      approvalStatus: 'draft',
+      approvalStatus: 'sent',
       comments: [],
       history: [],
     };
@@ -399,7 +414,7 @@ export const useStorage = () => {
     let updatedPresentation: Presentation | undefined;
     setAndPersistPresentations(prev => prev.map(item => {
       if (item.id !== id) return item;
-      updatedPresentation = touchPresentation({ ...item, approvalStatus });
+      updatedPresentation = touchPresentation(applyStatusToPresentation(item, approvalStatus));
       return updatedPresentation;
     }));
 

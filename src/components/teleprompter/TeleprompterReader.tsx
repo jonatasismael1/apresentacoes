@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   X, Play, Pause, RotateCcw, Plus, Minus, 
-  Maximize2, Minimize2, FlipHorizontal, Eye, EyeOff, Smartphone, Bug, FlaskConical
+  Maximize2, Minimize2, FlipHorizontal, Eye, EyeOff, Smartphone
 } from 'lucide-react';
 import type { TeleprompterSettings } from '../../types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTeleprompterKeys, type KeyDebugInfo } from '../../hooks/useTeleprompterKeys';
+import { useTeleprompterKeys } from '../../hooks/useTeleprompterKeys';
 
 interface Props {
   text: string;
@@ -20,9 +20,6 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
   const [showControls, setShowControls] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isRotatedCSS, setIsRotatedCSS] = useState(false);
-  const [isRehearsalMode, setIsRehearsalMode] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
-  const [debugLog, setDebugLog] = useState<KeyDebugInfo[]>([]);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [maxScroll, setMaxScroll] = useState(1);
   
@@ -31,7 +28,6 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
   const requestRef = useRef<number>(0);
   const lastTimeRef = useRef<number | null>(null);
   const countdownRef = useRef<number | null>(null);
-  const effectiveFontSize = isRehearsalMode ? Math.max(24, Math.round(settings.fontSize * 0.72)) : settings.fontSize;
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
   const estimatedMinutes = Math.max(1, Math.ceil(wordCount / Math.max(90, 150 * Math.max(settings.speed, 0.5))));
   const progress = Math.min(100, Math.max(0, (scrollPos / maxScroll) * 100));
@@ -44,7 +40,7 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
     updateMaxScroll();
     window.addEventListener('resize', updateMaxScroll);
     return () => window.removeEventListener('resize', updateMaxScroll);
-  }, [text, settings.width, settings.fontSize, settings.lineHeight, isRehearsalMode]);
+  }, [text, settings.width, settings.fontSize, settings.lineHeight]);
 
   useEffect(() => {
     const animate = (time: number) => {
@@ -144,11 +140,6 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
 
   useEffect(() => () => cancelCountdown(), [cancelCountdown]);
 
-  // Debug
-  const handleKeyDebug = useCallback((info: KeyDebugInfo) => {
-    setDebugLog(prev => [info, ...prev].slice(0, 10));
-  }, []);
-
   // Integra o hook de teclas — controle Bluetooth em modo HID
   // NOTA: ↑/↓ físicos do Ulanzi enviam VolumeUp/Down (SO intercepta no mobile).
   // Por isso mapeamos ←/→ contextualmente: pausado=scroll, rodando=velocidade.
@@ -158,7 +149,6 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
     onActionBackward:  handleLeft,
     onActionForward:   handleRight,
     onTogglePlayPause: handleTogglePlay,
-    onKeyDebug:        handleKeyDebug,
   });
 
   // ─── Fullscreen ──────────────────────────────────────────────────────────────
@@ -244,11 +234,6 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
         <span className="px-3 py-1 rounded-full bg-zinc-900/70 border border-zinc-800 backdrop-blur">
           {Math.round(progress)}%
         </span>
-        {isRehearsalMode && (
-          <span className="px-3 py-1 rounded-full bg-dbe-blue/20 text-dbe-blue border border-dbe-blue/30 backdrop-blur">
-            Ensaio
-          </span>
-        )}
       </div>
 
       {countdown !== null && (
@@ -279,7 +264,7 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
           ref={scrollRef}
           style={{ 
             width: `${settings.width}%`,
-            fontSize: `${effectiveFontSize}px`,
+            fontSize: `${settings.fontSize}px`,
             lineHeight: settings.lineHeight,
             transform: `translateY(${-scrollPos}px) ${settings.isMirrored ? 'scaleX(-1)' : ''}`,
             paddingTop: '50vh',
@@ -303,115 +288,10 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
         </div>
       </div>
 
-      {/* ── Painel de Debug Bluetooth ── */}
-      <AnimatePresence>
-        {showDebug && (
-          <motion.div
-            initial={{ x: '100%', opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: '100%', opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="absolute top-0 right-0 bottom-0 w-64 bg-black/95 border-l border-zinc-800 z-30 flex flex-col"
-          >
-            <div className="px-4 py-3 border-b border-zinc-800">
-              <p className="text-xs font-bold text-violet-400 uppercase tracking-widest">
-                🎮 Debug — Bluetooth HID
-              </p>
-              <p className="text-[10px] text-zinc-500 mt-1">
-                Pressione botões do controle
-              </p>
-              <div className="mt-2 text-[9px] text-amber-400/80 bg-amber-950/40 border border-amber-800/40 rounded px-2 py-1.5 leading-relaxed">
-                ⚠️ <strong>Mobile:</strong> Volume e Media keys são interceptadas pelo SO. Use setas (↑↓←→) ou Page Up/Down.
-              </div>
-            </div>
-
-            {/* Última tecla */}
-            {debugLog[0] ? (
-              <div className="px-4 py-3 border-b border-zinc-800 bg-violet-950/30">
-                <p className="text-[9px] text-zinc-500 uppercase tracking-wider mb-2">Última tecla recebida</p>
-                <div className="space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-[10px] text-zinc-400">event.key</span>
-                    <span className="text-[10px] font-mono font-bold text-violet-300">
-                      {debugLog[0].key === ' ' ? 'Space' : debugLog[0].key}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[10px] text-zinc-400">event.code</span>
-                    <span className="text-[10px] font-mono font-bold text-blue-300">{debugLog[0].code}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[10px] text-zinc-400">event.keyCode</span>
-                    <span className="text-[10px] font-mono font-bold text-green-300">{debugLog[0].keyCode}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[10px] text-zinc-400">tipo</span>
-                    <span className={`text-[10px] font-mono font-bold ${
-                      debugLog[0].type === 'keydown' ? 'text-amber-300' : 'text-zinc-500'
-                    }`}>{debugLog[0].type}</span>
-                  </div>
-                  {debugLog[0].action && (
-                    <div className="flex justify-between pt-1 border-t border-zinc-800 mt-1">
-                      <span className="text-[10px] text-zinc-400">ação</span>
-                      <span className="text-[10px] font-mono font-bold text-emerald-400">{debugLog[0].action}</span>
-                    </div>
-                  )}
-                  {!debugLog[0].action && (
-                    <div className="flex justify-between pt-1 border-t border-zinc-800 mt-1">
-                      <span className="text-[10px] text-zinc-400">ação</span>
-                      <span className="text-[10px] font-mono text-red-400">não mapeada</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="px-4 py-6 text-center text-zinc-600 text-xs">
-                Aguardando tecla...
-              </div>
-            )}
-
-            {/* Histórico */}
-            <div className="flex-1 overflow-y-auto px-4 py-2">
-              <p className="text-[9px] text-zinc-600 uppercase tracking-wider mb-2">Histórico</p>
-              {debugLog.slice(1).map((entry, i) => (
-                <div key={i} className="py-1 border-b border-zinc-900 flex justify-between items-center">
-                  <span className="text-[9px] font-mono text-zinc-500">
-                    {entry.key === ' ' ? '"Space"' : `"${entry.key}"`}
-                  </span>
-                  <span className={`text-[9px] font-mono ${
-                    entry.action ? 'text-emerald-600' : 'text-red-700'
-                  }`}>
-                    {entry.action ?? 'sem ação'}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Mapa de teclas ativas */}
-            <div className="px-4 py-3 border-t border-zinc-800">
-              <p className="text-[9px] text-zinc-500 uppercase tracking-wider mb-2">Mapeamento</p>
-              <div className="space-y-1">
-                {[
-                  { label: '↑ Subir',      keys: 'ArrowUp / PageUp' },
-                  { label: '↓ Descer',     keys: 'ArrowDown / PageDown' },
-                  { label: '← Voltar/Vel-',keys: 'ArrowLeft' },
-                  { label: '→ Avançar/Vel+',keys: 'ArrowRight' },
-                  { label: '⏯ Play/Pause', keys: 'Enter / Space' },
-                ].map(m => (
-                  <div key={m.label} className="flex justify-between">
-                    <span className="text-[9px] text-zinc-400">{m.label}</span>
-                    <span className="text-[9px] font-mono text-violet-400">{m.keys}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Controles Flutuantes */}
       <AnimatePresence>
-        {(showControls || isRehearsalMode) && (
+        {showControls && (
           <motion.div 
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -454,13 +334,6 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
 
               <div className="w-[1px] h-6 sm:h-8 bg-zinc-800 mx-0.5" />
 
-              <button
-                onClick={() => setIsRehearsalMode(prev => !prev)}
-                className={`p-2 sm:p-3 rounded-full transition-colors ${isRehearsalMode ? 'text-dbe-green bg-dbe-green/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
-                title="Modo ensaio"
-              >
-                <FlaskConical size={18} />
-              </button>
 
               <button 
                 onClick={() => updateSettings({ isMirrored: !settings.isMirrored })}
@@ -486,14 +359,6 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
                 <Smartphone size={18} className={isRotatedCSS ? 'rotate-90' : ''} />
               </button>
 
-              {/* Botão de Debug */}
-              <button 
-                onClick={() => setShowDebug(d => !d)}
-                className={`p-2 sm:p-3 rounded-full transition-colors ${showDebug ? 'text-violet-400 bg-violet-400/10' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
-                title="Debug Bluetooth"
-              >
-                <Bug size={18} />
-              </button>
 
               <button 
                 onClick={onExit}
@@ -504,7 +369,7 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
             </div>
 
             <div className="px-3 py-1 bg-black/60 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-zinc-400 border border-zinc-800 backdrop-blur-sm">
-              {settings.speed.toFixed(1)}x | {effectiveFontSize}px | {estimatedMinutes} min
+              {settings.speed.toFixed(1)}x | {settings.fontSize}px | {estimatedMinutes} min
               {isPlaying && <span className="ml-2 text-amber-400 animate-pulse">● REPRODUZINDO</span>}
             </div>
           </motion.div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStorage } from '../hooks/useStorage';
 import { useToast } from '../components/toastContext';
-import type { Presentation, Script } from '../types';
+import type { ApprovalStatus, Presentation, Script } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   ArrowLeft, Save, Plus, Trash2, 
@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import type { DropResult } from '@hello-pangea/dnd';
 import { SCRIPT_TEMPLATES } from '../constants/scriptTemplates';
+import { PRESENTATION_STATUSES } from '../constants/presentationStatus';
 
 const Editor: React.FC = () => {
   const { id } = useParams();
@@ -44,7 +45,7 @@ const Editor: React.FC = () => {
     scripts: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    approvalStatus: 'draft',
+    approvalStatus: 'sent',
     comments: [],
     history: [],
   });
@@ -56,6 +57,7 @@ const Editor: React.FC = () => {
   const [saveState, setSaveState] = useState<'idle' | 'local' | 'syncing' | 'synced'>('idle');
   const [collapsedScripts, setCollapsedScripts] = useState<Set<string>>(new Set());
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [showScriptNav, setShowScriptNav] = useState(false);
 
   useEffect(() => {
     if (id && !hasLoaded.current) {
@@ -117,6 +119,19 @@ const Editor: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleStatusChange = (approvalStatus: ApprovalStatus) => {
+    setFormData(prev => {
+      const next = { ...prev, approvalStatus };
+      if (approvalStatus === 'finalized') {
+        return { ...next, archivedAt: prev.archivedAt || new Date().toISOString() };
+      }
+
+      const { archivedAt: _archivedAt, ...activePresentation } = next;
+      void _archivedAt;
+      return activePresentation;
+    });
   };
 
   const handleSave = () => {
@@ -243,16 +258,16 @@ const Editor: React.FC = () => {
   return (
     <div className="flex flex-col h-screen bg-dbe-darker">
       {/* Header */}
-      <header className="h-16 border-b border-zinc-800 flex items-center justify-between px-6 bg-dbe-dark shrink-0">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/')} className="btn-ghost">
+      <header className="min-h-16 border-b border-zinc-800 flex flex-wrap items-center justify-between gap-2 px-3 py-2 md:px-6 bg-dbe-dark shrink-0">
+        <div className="flex min-w-0 items-center gap-2 md:gap-4">
+          <button onClick={() => navigate('/')} className="btn-ghost px-2 md:px-4">
             <ArrowLeft size={20} />
           </button>
           <h1 className="font-bold hidden md:block">
             {id ? 'Editar Apresentação' : 'Nova Apresentação'}
           </h1>
           {saveState !== 'idle' && (
-            <span className="text-xs font-bold text-dbe-blue ml-2 bg-dbe-blue/10 px-2 py-1 rounded flex items-center gap-1">
+            <span className="text-[11px] md:text-xs font-bold text-dbe-blue bg-dbe-blue/10 px-2 py-1 rounded flex items-center gap-1 whitespace-nowrap">
               {saveState === 'synced' ? <CheckCircle size={12} /> : <RefreshDot />}
               {saveState === 'local' && 'Salvo localmente'}
               {saveState === 'syncing' && 'Sincronizando'}
@@ -261,7 +276,21 @@ const Editor: React.FC = () => {
           )}
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-1 items-center justify-end gap-2 md:gap-3">
+          <select
+            value={formData.approvalStatus || 'sent'}
+            onChange={event => handleStatusChange(event.target.value as ApprovalStatus)}
+            className="input-field h-10 max-w-[145px] px-2 py-1 text-xs md:max-w-[180px]"
+            aria-label="Status da apresentacao"
+          >
+            {PRESENTATION_STATUSES.map(status => (
+              <option key={status.value} value={status.value}>{status.label}</option>
+            ))}
+          </select>
+          <button onClick={() => setShowBulkImport(true)} className="btn-secondary px-3" title="Importar roteiros">
+            <FileText size={18} />
+            <span className="hidden sm:inline">Importar</span>
+          </button>
           <button 
             onClick={() => setShowPreview(!showPreview)} 
             className={`btn-secondary hidden lg:flex ${showPreview ? 'bg-dbe-blue/20 text-dbe-blue' : ''}`}
@@ -269,11 +298,11 @@ const Editor: React.FC = () => {
             <Eye size={18} />
             Preview
           </button>
-          <button onClick={() => navigate(`/visualizar/${formData.id}`)} className="btn-secondary" disabled={!id}>
+          <button onClick={() => navigate(`/visualizar/${formData.id}`)} className="btn-secondary hidden sm:flex" disabled={!id}>
             <Layout size={18} />
             Visualizar
           </button>
-          <button onClick={handleSave} className="btn-primary">
+          <button onClick={handleSave} className="btn-primary px-3 md:px-4">
             <Save size={18} />
             Salvar
           </button>
@@ -461,7 +490,7 @@ const Editor: React.FC = () => {
                 <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 space-y-3">
                   <div className="flex items-center gap-2 text-sm font-bold">
                     <BookOpen size={16} className="text-dbe-blue" />
-                    Biblioteca de templates
+                    Tipo de conteudo
                   </div>
                   <div className="flex gap-2">
                     <select
@@ -469,7 +498,7 @@ const Editor: React.FC = () => {
                       onChange={event => setSelectedTemplateId(event.target.value)}
                       className="input-field flex-1"
                     >
-                      <option value="">Escolher template...</option>
+                      <option value="">Escolher tipo...</option>
                       {SCRIPT_TEMPLATES.map(template => (
                         <option key={template.id} value={template.id}>{template.name}</option>
                       ))}
@@ -483,6 +512,15 @@ const Editor: React.FC = () => {
                 {formData.scripts.length > 0 && (
                   <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
                     <p className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-2">Navegação dos roteiros</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowScriptNav(prev => !prev)}
+                      className="mb-2 w-full flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-zinc-400"
+                    >
+                      <span>{showScriptNav ? 'Ocultar lista' : 'Mostrar lista'}</span>
+                      {showScriptNav ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </button>
+                    {showScriptNav && (
                     <div className="space-y-1 max-h-44 overflow-y-auto">
                       {formData.scripts.map((script, index) => (
                         <button
@@ -495,6 +533,7 @@ const Editor: React.FC = () => {
                         </button>
                       ))}
                     </div>
+                    )}
                   </div>
                 )}
 

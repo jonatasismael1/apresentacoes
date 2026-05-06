@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { X, Check, FileText, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { v4 as uuidv4 } from 'uuid';
@@ -130,10 +130,13 @@ function parseRawText(rawText: string): ParsedScriptPreview[] {
 }
 
 const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClose, onImport, templates = [] }) => {
+  const defaultTemplateId = useMemo(() => (
+    templates.some(template => template.id === 'template-reels') ? 'template-reels' : ''
+  ), [templates]);
   const [rawText, setRawText] = useState('');
   const [previews, setPreviews] = useState<ParsedScriptPreview[]>([]);
   const [step, setStep] = useState<1 | 2>(1);
-  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState(defaultTemplateId);
 
   if (!isOpen) return null;
 
@@ -164,7 +167,7 @@ const BulkImportModal: React.FC<BulkImportModalProps> = ({ isOpen, onClose, onIm
     setRawText('');
     setPreviews([]);
     setStep(1);
-    setSelectedTemplateId('');
+    setSelectedTemplateId(defaultTemplateId);
     onClose();
   };
 

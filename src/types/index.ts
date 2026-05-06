@@ -20,7 +20,7 @@ export interface Presentation {
   history?: PresentationVersion[];
 }
 
-export type ApprovalStatus = 'draft' | 'sent' | 'approved' | 'changes_requested';
+export type ApprovalStatus = 'sent' | 'approved' | 'revision' | 'recorded' | 'finalized';
 
 export interface ApprovalComment {
   id: string;
@@ -78,7 +78,7 @@ export interface Script {
 export interface ScriptTemplate {
   id: string;
   name: string;
-  category: 'venda' | 'institucional' | 'reels' | 'aula' | 'podcast' | 'anuncio';
+  category: 'carrossel' | 'story' | 'post_estatico' | 'reels' | 'youtube' | 'podcast' | 'outdoor';
   description: string;
   script: Omit<Script, 'id'>;
 }

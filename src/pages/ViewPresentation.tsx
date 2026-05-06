@@ -4,7 +4,6 @@ import { useStorage } from '../hooks/useStorage';
 import { useToast } from '../components/toastContext';
 import {
   ArrowLeft,
-  CheckCircle,
   Copy,
   Download,
   Edit2,
@@ -13,7 +12,6 @@ import {
   MessageSquare,
   Monitor,
   Printer,
-  Send,
   X,
 } from 'lucide-react';
 import PresentationPreview from '../components/PresentationPreview';
@@ -24,13 +22,7 @@ import {
   generateStandaloneHTML,
   normalizeExportOptions,
 } from '../lib/exportDocuments';
-
-const APPROVAL_LABELS: Record<ApprovalStatus, string> = {
-  draft: 'Rascunho',
-  sent: 'Enviado',
-  approved: 'Aprovado',
-  changes_requested: 'Ajustes solicitados',
-};
+import { PRESENTATION_STATUSES, PRESENTATION_STATUS_LABELS } from '../constants/presentationStatus';
 
 const ViewPresentation: React.FC = () => {
   const { id } = useParams();
@@ -91,11 +83,11 @@ const ViewPresentation: React.FC = () => {
     }
   };
 
-  const handleDuplicate = (sameClientOnly = false) => {
+  const handleDuplicate = () => {
     if (!id) return;
-    const newId = duplicatePresentation(id, sameClientOnly);
+    const newId = duplicatePresentation(id);
     if (newId) {
-      showToast(sameClientOnly ? 'Novo projeto criado para o mesmo cliente.' : 'Apresentação duplicada.', 'success');
+      showToast('Apresentação duplicada.', 'success');
       navigate(`/editar/${newId}`);
     }
   };
@@ -110,7 +102,7 @@ const ViewPresentation: React.FC = () => {
   const handleStatus = (approvalStatus: ApprovalStatus) => {
     if (!id) return;
     updateApprovalStatus(id, approvalStatus);
-    showToast(`Status alterado para ${APPROVAL_LABELS[approvalStatus]}.`, 'success');
+    showToast(`Status alterado para ${PRESENTATION_STATUS_LABELS[approvalStatus]}.`, 'success');
   };
 
   const handleScriptToggle = (scriptId: string) => {
@@ -124,53 +116,63 @@ const ViewPresentation: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 overflow-x-hidden">
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-zinc-900/85 backdrop-blur-md p-2 rounded-full border border-zinc-800 shadow-2xl no-print">
-        <button onClick={() => navigate(`/editar/${id}`)} className="p-2.5 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all" title="Voltar a editar">
+      <div className="fixed inset-x-0 top-0 z-50 bg-zinc-950/92 backdrop-blur-md border-b border-zinc-800 shadow-2xl no-print">
+        <div className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-2 py-2 sm:gap-2">
+        <button onClick={() => navigate(`/editar/${id}`)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all shrink-0" title="Voltar a editar">
           <ArrowLeft size={20} />
         </button>
-        <div className="w-px h-6 bg-zinc-800 mx-1" />
-        <button onClick={() => navigate(`/teleprompter/${id}`)} className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-800 rounded-full text-sm font-medium text-zinc-300 hover:text-white transition-all">
+        <div className="w-px h-6 bg-zinc-800 mx-1 shrink-0" />
+        <button onClick={() => navigate(`/teleprompter/${id}`)} className="flex items-center gap-1.5 px-3 py-2 hover:bg-zinc-800 rounded-full text-xs sm:text-sm font-medium text-zinc-300 hover:text-white transition-all shrink-0">
           <Monitor size={18} />
-          <span className="hidden md:inline">Teleprompter</span>
+          <span>Teleprompter</span>
         </button>
-        <button onClick={() => setShowExport(true)} className="flex items-center gap-2 px-4 py-2 hover:bg-zinc-800 rounded-full text-sm font-medium text-zinc-300 hover:text-white transition-all">
+        <button onClick={() => setShowExport(true)} className="flex items-center gap-1.5 px-3 py-2 hover:bg-zinc-800 rounded-full text-xs sm:text-sm font-medium text-zinc-300 hover:text-white transition-all shrink-0">
           <Download size={18} />
-          <span className="hidden md:inline">Exportar</span>
+          <span>Exportar</span>
         </button>
-        <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-dbe-blue hover:bg-blue-600 rounded-full text-sm font-medium text-white transition-all">
+        <button onClick={handlePrint} className="flex items-center gap-1.5 px-3 py-2 bg-dbe-blue hover:bg-blue-600 rounded-full text-xs sm:text-sm font-medium text-white transition-all shrink-0">
           <Printer size={18} />
-          <span className="hidden md:inline">PDF</span>
+          <span>PDF</span>
         </button>
-        <div className="w-px h-6 bg-zinc-800 mx-1" />
-        <button onClick={handleCopyContent} className="p-2.5 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all" title="Copiar texto">
+        <div className="w-px h-6 bg-zinc-800 mx-1 shrink-0" />
+        <button onClick={handleCopyContent} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all shrink-0" title="Copiar texto">
           <Copy size={18} />
         </button>
-        <button onClick={() => handleDuplicate()} className="p-2.5 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all" title="Duplicar">
+        <button onClick={() => handleDuplicate()} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all shrink-0" title="Duplicar">
           <FileCode size={18} />
         </button>
-        <button onClick={() => handleDuplicate(true)} className="p-2.5 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all" title="Novo projeto para o mesmo cliente">
-          <FileText size={18} />
-        </button>
-        <button onClick={() => navigate(`/editar/${id}`)} className="p-2.5 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all" title="Editar">
+        <button onClick={() => navigate(`/editar/${id}`)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-all shrink-0" title="Editar">
           <Edit2 size={18} />
         </button>
+        </div>
+        <div className="mx-auto max-w-6xl px-2 pb-2">
+          <select
+            value={data.approvalStatus || 'sent'}
+            onChange={event => handleStatus(event.target.value as ApprovalStatus)}
+            className="input-field h-10 w-full py-1 text-sm sm:max-w-xs"
+            aria-label="Status da apresentacao"
+          >
+            {PRESENTATION_STATUSES.map(status => (
+              <option key={status.value} value={status.value}>{status.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="fixed top-24 right-6 z-40 w-72 bg-zinc-900/90 border border-zinc-800 rounded-xl p-4 shadow-2xl backdrop-blur no-print hidden xl:block">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-bold uppercase tracking-wider text-zinc-500">Aprovação</span>
-          <span className="text-xs text-dbe-blue font-bold">{APPROVAL_LABELS[data.approvalStatus || 'draft']}</span>
+          <span className="text-xs text-dbe-blue font-bold">{PRESENTATION_STATUS_LABELS[data.approvalStatus || 'sent']}</span>
         </div>
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <button onClick={() => handleStatus('sent')} className="btn-secondary text-xs py-2">
-            <Send size={13} />
-            Enviado
-          </button>
-          <button onClick={() => handleStatus('approved')} className="btn-secondary text-xs py-2 text-dbe-green">
-            <CheckCircle size={13} />
-            Aprovado
-          </button>
-        </div>
+        <select
+          value={data.approvalStatus || 'sent'}
+          onChange={event => handleStatus(event.target.value as ApprovalStatus)}
+          className="input-field mb-3 text-xs"
+        >
+          {PRESENTATION_STATUSES.map(status => (
+            <option key={status.value} value={status.value}>{status.label}</option>
+          ))}
+        </select>
         <textarea
           value={comment}
           onChange={event => setComment(event.target.value)}
@@ -183,7 +185,9 @@ const ViewPresentation: React.FC = () => {
         </button>
       </div>
 
-      <PresentationPreview data={data} />
+      <div className="pt-28 sm:pt-24">
+        <PresentationPreview data={data} />
+      </div>
 
       {showExport && (
         <ExportModal
