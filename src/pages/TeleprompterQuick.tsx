@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Play, ChevronUp, ChevronDown, Minus, Plus } from 'lucide-react';
+import {
+  ArrowLeft, Play, ChevronUp, ChevronDown, Minus, Plus,
+  FlipHorizontal, Timer, AlignCenter, AlignJustify, AlignLeft, AlignRight
+} from 'lucide-react';
 import DBELogo from '../components/DBELogo';
 import TeleprompterReader from '../components/teleprompter/TeleprompterReader';
-import type { TeleprompterSettings } from '../types';
+import type { TeleprompterSettings, TeleprompterTextAlign } from '../types';
 
 const DEFAULT_SETTINGS: TeleprompterSettings = {
   speed: 2,
@@ -11,23 +14,34 @@ const DEFAULT_SETTINGS: TeleprompterSettings = {
   lineHeight: 1.5,
   width: 80,
   isMirrored: false,
+  enableCountdown: true,
+  textAlign: 'center',
   theme: 'dark',
   bgColor: '#000000',
   textColor: '#ffffff',
+};
+
+const ALIGNMENT_OPTIONS: Array<{ value: TeleprompterTextAlign; label: string; icon: React.ElementType }> = [
+  { value: 'center', label: 'Centro', icon: AlignCenter },
+  { value: 'justify', label: 'Justificado', icon: AlignJustify },
+  { value: 'left', label: 'Esquerda', icon: AlignLeft },
+  { value: 'right', label: 'Direita', icon: AlignRight },
+];
+
+const readStoredSettings = (): TeleprompterSettings => {
+  try {
+    const stored = localStorage.getItem('dbe_tp_settings');
+    return stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } : DEFAULT_SETTINGS;
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
 };
 
 const TeleprompterQuick: React.FC = () => {
   const navigate = useNavigate();
   const [text, setText] = useState('');
   const [isStarted, setIsStarted] = useState(false);
-  const [settings, setSettings] = useState<TeleprompterSettings>(() => {
-    try {
-      const stored = localStorage.getItem('dbe_tp_settings');
-      return stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } : DEFAULT_SETTINGS;
-    } catch {
-      return DEFAULT_SETTINGS;
-    }
-  });
+  const [settings, setSettings] = useState<TeleprompterSettings>(readStoredSettings);
 
   const updateSetting = <K extends keyof TeleprompterSettings>(key: K, value: TeleprompterSettings[K]) => {
     setSettings(prev => {
@@ -48,6 +62,7 @@ const TeleprompterQuick: React.FC = () => {
           setSettings(updated);
           localStorage.setItem('dbe_tp_settings', JSON.stringify(updated));
         }}
+        autoStart
       />
     );
   }
@@ -109,9 +124,56 @@ const TeleprompterQuick: React.FC = () => {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
+            <div className="flex items-center justify-between p-3 bg-zinc-900 rounded-lg">
+              <div className="flex items-center gap-3">
+                <FlipHorizontal size={18} className="text-zinc-500" />
+                <span className="text-sm font-medium">Espelhar texto</span>
+              </div>
+              <button
+                onClick={() => updateSetting('isMirrored', !settings.isMirrored)}
+                className={`w-12 h-6 rounded-full transition-colors relative ${settings.isMirrored ? 'bg-dbe-blue' : 'bg-zinc-700'}`}
+                title="Espelhar texto"
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings.isMirrored ? 'left-7' : 'left-1'}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-zinc-900 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Timer size={18} className="text-zinc-500" />
+                <span className="text-sm font-medium">Contagem</span>
+              </div>
+              <button
+                onClick={() => updateSetting('enableCountdown', !settings.enableCountdown)}
+                className={`w-12 h-6 rounded-full transition-colors relative ${settings.enableCountdown ? 'bg-dbe-blue' : 'bg-zinc-700'}`}
+                title="Contagem regressiva"
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings.enableCountdown ? 'left-7' : 'left-1'}`} />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <p className="text-xs text-zinc-400 font-medium mb-2">Alinhamento do texto</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {ALIGNMENT_OPTIONS.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  onClick={() => updateSetting('textAlign', value)}
+                  className={`flex items-center justify-center gap-2 p-2 rounded-lg border transition-all text-xs font-bold ${settings.textAlign === value ? 'border-dbe-blue bg-dbe-blue/10 text-dbe-blue' : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white'}`}
+                  title={label}
+                >
+                  <Icon size={14} />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Preview mini */}
-          <div className="mt-4 bg-black rounded-lg p-3 text-center overflow-hidden h-16 flex items-center justify-center">
-            <span style={{ fontSize: `${Math.min(settings.fontSize * 0.5, 32)}px`, color: settings.textColor || '#fff', fontWeight: 600 }}>
+          <div className="mt-4 bg-black rounded-lg p-3 overflow-hidden h-16 flex items-center justify-center">
+            <span style={{ fontSize: `${Math.min(settings.fontSize * 0.5, 32)}px`, color: settings.textColor || '#fff', fontWeight: 600, textAlign: settings.textAlign || 'center', width: '100%' }}>
               Prévia do texto
             </span>
           </div>
@@ -140,7 +202,7 @@ const TeleprompterQuick: React.FC = () => {
         </button>
 
         <p className="text-center text-xs text-zinc-600 pb-6">
-          As configurações de velocidade e fonte são salvas automaticamente.
+          As configurações de leitura são salvas automaticamente.
         </p>
       </main>
     </div>

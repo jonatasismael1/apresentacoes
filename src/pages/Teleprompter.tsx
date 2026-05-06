@@ -4,9 +4,10 @@ import { useStorage } from '../hooks/useStorage';
 import { useToast } from '../components/toastContext';
 import { 
   ArrowLeft, Play, Settings as SettingsIcon, 
-  FlipHorizontal, Sun, Moon, Layout, Save
+  FlipHorizontal, Sun, Moon, Layout, Save, Timer,
+  AlignCenter, AlignJustify, AlignLeft, AlignRight
 } from 'lucide-react';
-import type { TeleprompterSettings } from '../types';
+import type { TeleprompterSettings, TeleprompterTextAlign } from '../types';
 import DBELogo from '../components/DBELogo';
 import TeleprompterReader from '../components/teleprompter/TeleprompterReader';
 
@@ -16,6 +17,8 @@ const DEFAULT_SETTINGS: TeleprompterSettings = {
   lineHeight: 1.5,
   width: 80,
   isMirrored: false,
+  enableCountdown: true,
+  textAlign: 'center',
   theme: 'dark',
   bgColor: '#000000',
   textColor: '#ffffff',
@@ -28,10 +31,26 @@ const PRESETS = {
   podcast: { speed: 1.2, fontSize: 38, lineHeight: 1.8 },
 };
 
+const ALIGNMENT_OPTIONS: Array<{ value: TeleprompterTextAlign; label: string; icon: React.ElementType }> = [
+  { value: 'center', label: 'Centralizado', icon: AlignCenter },
+  { value: 'justify', label: 'Justificado', icon: AlignJustify },
+  { value: 'left', label: 'Esquerda', icon: AlignLeft },
+  { value: 'right', label: 'Direita', icon: AlignRight },
+];
+
 interface CustomPreset {
   name: string;
   settings: TeleprompterSettings;
 }
+
+const readStoredSettings = (): TeleprompterSettings => {
+  try {
+    const stored = localStorage.getItem('dbe_tp_settings');
+    return stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } : DEFAULT_SETTINGS;
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+};
 
 const Teleprompter: React.FC = () => {
   const { id } = useParams();
@@ -42,10 +61,7 @@ const Teleprompter: React.FC = () => {
   const [selectedPresentationId, setSelectedPresentationId] = useState(id || '');
   const [selectedScriptId, setSelectedScriptId] = useState<string>('all');
   const [isStarted, setIsStarted] = useState(false);
-  const [settings, setSettings] = useState<TeleprompterSettings>(() => {
-    const stored = localStorage.getItem('dbe_tp_settings');
-    return stored ? JSON.parse(stored) : DEFAULT_SETTINGS;
-  });
+  const [settings, setSettings] = useState<TeleprompterSettings>(readStoredSettings);
   const [customPresets, setCustomPresets] = useState<CustomPreset[]>(() => {
     try {
       const stored = localStorage.getItem('dbe_tp_custom_presets');
@@ -86,7 +102,7 @@ const Teleprompter: React.FC = () => {
   };
 
   const applyCustomPreset = (preset: CustomPreset) => {
-    setSettings(preset.settings);
+    setSettings({ ...DEFAULT_SETTINGS, ...preset.settings });
     showToast(`Preset "${preset.name}" aplicado`, 'success');
   };
 
@@ -96,7 +112,8 @@ const Teleprompter: React.FC = () => {
         text={getCombinedText()} 
         settings={settings} 
         onExit={() => setIsStarted(false)}
-        updateSettings={(newSettings) => setSettings({ ...settings, ...newSettings })}
+        updateSettings={(newSettings) => setSettings(prev => ({ ...prev, ...newSettings }))}
+        autoStart
       />
     );
   }
@@ -257,17 +274,51 @@ const Teleprompter: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-zinc-900 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <FlipHorizontal size={18} className="text-zinc-500" />
-                  <span className="text-sm font-medium">Espelhar Texto</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="flex items-center justify-between p-3 bg-zinc-900 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FlipHorizontal size={18} className="text-zinc-500" />
+                    <span className="text-sm font-medium">Espelhar Texto</span>
+                  </div>
+                  <button 
+                    onClick={() => setSettings({...settings, isMirrored: !settings.isMirrored})}
+                    className={`w-12 h-6 rounded-full transition-colors relative ${settings.isMirrored ? 'bg-dbe-blue' : 'bg-zinc-700'}`}
+                    title="Espelhar texto"
+                  >
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings.isMirrored ? 'left-7' : 'left-1'}`} />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => setSettings({...settings, isMirrored: !settings.isMirrored})}
-                  className={`w-12 h-6 rounded-full transition-colors relative ${settings.isMirrored ? 'bg-dbe-blue' : 'bg-zinc-700'}`}
-                >
-                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings.isMirrored ? 'left-7' : 'left-1'}`} />
-                </button>
+
+                <div className="flex items-center justify-between p-3 bg-zinc-900 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Timer size={18} className="text-zinc-500" />
+                    <span className="text-sm font-medium">Contagem</span>
+                  </div>
+                  <button 
+                    onClick={() => setSettings({...settings, enableCountdown: !settings.enableCountdown})}
+                    className={`w-12 h-6 rounded-full transition-colors relative ${settings.enableCountdown ? 'bg-dbe-blue' : 'bg-zinc-700'}`}
+                    title="Contagem regressiva"
+                  >
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${settings.enableCountdown ? 'left-7' : 'left-1'}`} />
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="label mb-3">Alinhamento do texto</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {ALIGNMENT_OPTIONS.map(({ value, label, icon: Icon }) => (
+                    <button
+                      key={value}
+                      onClick={() => setSettings({...settings, textAlign: value})}
+                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all text-xs font-bold ${settings.textAlign === value ? 'border-dbe-blue bg-dbe-blue/10 text-dbe-blue' : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white'}`}
+                      title={label}
+                    >
+                      <Icon size={16} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="flex gap-2">

@@ -51,12 +51,16 @@ export interface ClientProfile {
 
 export type SyncStatus = 'local' | 'syncing' | 'synced' | 'pending' | 'error';
 
+export type TeleprompterTextAlign = 'center' | 'justify' | 'left' | 'right';
+
 export interface TeleprompterSettings {
   speed: number;
   fontSize: number;
   lineHeight: number;
   width: number; // percentage
   isMirrored: boolean;
+  enableCountdown: boolean;
+  textAlign: TeleprompterTextAlign;
   theme: 'dark' | 'light' | 'custom';
   bgColor: string;
   textColor: string;

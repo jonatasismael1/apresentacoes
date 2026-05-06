@@ -52,21 +52,21 @@ const Dashboard: React.FC = () => {
   } = useStorage();
   const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
-  const [segmentFilter, setSegmentFilter] = useState('all');
+  const [clientFilter, setClientFilter] = useState('all');
   const [tab, setTab] = useState<DashboardTab>('active');
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [pendingArchive, setPendingArchive] = useState<Presentation | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<Presentation | null>(null);
 
-  const segments = useMemo(() => (
-    Array.from(new Set(presentations.map(item => item.clientSegment).filter(Boolean))).sort()
+  const clients = useMemo(() => (
+    Array.from(new Set(presentations.map(item => item.clientName).filter(Boolean))).sort()
   ), [presentations]);
 
   const filtered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return presentations
       .filter(item => tab === 'archived' ? Boolean(item.archivedAt) : !item.archivedAt)
-      .filter(item => segmentFilter === 'all' || item.clientSegment === segmentFilter)
+      .filter(item => clientFilter === 'all' || item.clientName === clientFilter)
       .filter(item => {
         if (!term) return true;
         const haystack = [
@@ -80,7 +80,7 @@ const Dashboard: React.FC = () => {
         return haystack.includes(term);
       })
       .sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
-  }, [presentations, searchTerm, segmentFilter, tab]);
+  }, [presentations, searchTerm, clientFilter, tab]);
 
   const handleArchive = (presentation: Presentation) => {
     archivePresentation(presentation.id);
@@ -184,9 +184,9 @@ const Dashboard: React.FC = () => {
             onChange={event => setSearchTerm(event.target.value)}
           />
         </div>
-        <select value={segmentFilter} onChange={event => setSegmentFilter(event.target.value)} className="input-field lg:w-56">
-          <option value="all">Todos os segmentos</option>
-          {segments.map(segment => <option key={segment} value={segment}>{segment}</option>)}
+        <select value={clientFilter} onChange={event => setClientFilter(event.target.value)} className="input-field lg:w-56">
+          <option value="all">Todos os clientes</option>
+          {clients.map(client => <option key={client} value={client}>{client}</option>)}
         </select>
         <div className="flex gap-2">
           <button onClick={() => setViewMode('cards')} className={`btn-secondary px-3 ${viewMode === 'cards' ? 'text-dbe-blue bg-dbe-blue/10' : ''}`} title="Cards">
@@ -212,7 +212,7 @@ const Dashboard: React.FC = () => {
       ) : filtered.length === 0 ? (
         <EmptyState
           title={tab === 'archived' ? 'Nenhuma apresentação arquivada' : 'Nenhuma apresentação encontrada'}
-          description={presentations.length === 0 ? 'Crie sua primeira apresentação ou sincronize novamente.' : 'Ajuste os filtros ou a busca.'}
+          description={presentations.length === 0 ? 'Crie sua primeira apresentação ou sincronize novamente.' : 'Ajuste o cliente selecionado ou a busca.'}
           onRefresh={() => refresh()}
         />
       ) : viewMode === 'cards' ? (

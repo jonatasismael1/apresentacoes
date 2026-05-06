@@ -12,9 +12,10 @@ interface Props {
   settings: TeleprompterSettings;
   onExit: () => void;
   updateSettings: (settings: Partial<TeleprompterSettings>) => void;
+  autoStart?: boolean;
 }
 
-const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSettings }) => {
+const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSettings, autoStart = false }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [scrollPos, setScrollPos] = useState(0);
   const [showControls, setShowControls] = useState(true);
@@ -28,6 +29,7 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
   const requestRef = useRef<number>(0);
   const lastTimeRef = useRef<number | null>(null);
   const countdownRef = useRef<number | null>(null);
+  const hasAutoStartedRef = useRef(false);
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
   const estimatedMinutes = Math.max(1, Math.ceil(wordCount / Math.max(90, 150 * Math.max(settings.speed, 0.5))));
   const progress = Math.min(100, Math.max(0, (scrollPos / maxScroll) * 100));
@@ -110,17 +112,13 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
     setCountdown(null);
   }, []);
 
-  const handleTogglePlay = useCallback(() => {
-    if (countdown !== null) {
-      cancelCountdown();
+  const startPlayback = useCallback(() => {
+    if (settingsRef.current.enableCountdown === false) {
+      setIsPlaying(true);
       return;
     }
 
-    if (isPlayingRef.current) {
-      setIsPlaying(false);
-      return;
-    }
-
+    cancelCountdown();
     setCountdown(3);
     countdownRef.current = window.setInterval(() => {
       setCountdown(prev => {
@@ -136,7 +134,27 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
         return prev - 1;
       });
     }, 700);
-  }, [cancelCountdown, countdown]);
+  }, [cancelCountdown]);
+
+  const handleTogglePlay = useCallback(() => {
+    if (countdown !== null) {
+      cancelCountdown();
+      return;
+    }
+
+    if (isPlayingRef.current) {
+      setIsPlaying(false);
+      return;
+    }
+
+    startPlayback();
+  }, [cancelCountdown, countdown, startPlayback]);
+
+  useEffect(() => {
+    if (!autoStart || hasAutoStartedRef.current) return;
+    hasAutoStartedRef.current = true;
+    startPlayback();
+  }, [autoStart, startPlayback]);
 
   useEffect(() => () => cancelCountdown(), [cancelCountdown]);
 
@@ -269,7 +287,7 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
             transform: `translateY(${-scrollPos}px) ${settings.isMirrored ? 'scaleX(-1)' : ''}`,
             paddingTop: '50vh',
             paddingBottom: '50vh',
-            textAlign: 'center',
+            textAlign: settings.textAlign || 'center',
             fontWeight: 600,
             transition: isPlaying ? 'none' : 'transform 0.1s ease-out'
           }}
