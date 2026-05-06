@@ -21,14 +21,18 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#063b63_0%,#07111f_34%,#050507_72%)] flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md bg-zinc-950/85 border border-white/10 rounded-2xl p-8 shadow-2xl shadow-black/50 relative overflow-hidden backdrop-blur">
         
         {/* Detail */}
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-dbe-blue via-blue-400 to-emerald-400" />
 
         <div className="flex justify-center mb-8">
-          <img src="/pwa-512x512.png" alt="DBE Logo" className="h-20 w-auto object-contain" />
+          <img
+            src="/logo-dbe-roteiros.png"
+            alt="DBE Roteiros"
+            className="h-24 w-auto max-w-[280px] object-contain drop-shadow-[0_18px_34px_rgba(0,71,255,0.22)]"
+          />
         </div>
         <p className="text-zinc-400 text-center mb-8 text-sm">
           Acesso restrito. Insira suas credenciais.
