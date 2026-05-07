@@ -305,10 +305,13 @@ const Editor: React.FC = () => {
   };
 
   const handleBulkImport = (newScripts: Script[]) => {
-    setFormData(prev => ({
-      ...prev,
-      scripts: [...prev.scripts, ...newScripts]
-    }));
+    const nextFormData = {
+      ...formData,
+      scripts: [...formData.scripts, ...newScripts],
+    };
+    latestFormDataRef.current = nextFormData;
+    setFormData(nextFormData);
+    persistDraft(nextFormData);
     showToast(`${newScripts.length} roteiros importados com sucesso!`, 'success');
   };
 

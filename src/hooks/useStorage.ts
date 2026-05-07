@@ -14,9 +14,11 @@ import { normalizeApprovalStatus, type LegacyApprovalStatus } from '../constants
 const STORAGE_KEY = 'dbe_apresentacoes';
 const CLIENT_PROFILES_KEY = 'dbe_client_profiles';
 const EXAMPLE_FLAG = 'dbe_is_example';
+const LOCAL_SAVE_META_KEY = 'dbe_local_save_meta';
 const DELETED_PRESENTATIONS_KEY = 'dbe_deleted_presentations';
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbzTt15VdiCcqn9kYwQkl4oc2jQ5UL8uYJZ1k2ToMNRby4F-TJ7C7zLYKVc4HA2hI2YG/exec';
 const MAX_HISTORY_ENTRIES = 20;
+const LOCAL_SAVE_GRACE_MS = 10 * 60 * 1000;
 const DELETE_TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const DELETED_PRESENTATION_MARKER = '__DBE_DELETED__';
 
@@ -103,6 +105,24 @@ const getPayloadId = (payload: unknown): string | undefined => {
   return typeof maybePayload.id === 'string' ? maybePayload.id : undefined;
 };
 
+const markLocalSave = (id: string) => {
+  const meta = readJsonObject<TimestampMap>(LOCAL_SAVE_META_KEY);
+  meta[id] = Date.now();
+  writeJsonObject(LOCAL_SAVE_META_KEY, meta);
+};
+
+const clearLocalSave = (id: string) => {
+  const meta = readJsonObject<TimestampMap>(LOCAL_SAVE_META_KEY);
+  if (!(id in meta)) return;
+  delete meta[id];
+  writeJsonObject(LOCAL_SAVE_META_KEY, meta);
+};
+
+const isRecentLocalSave = (meta: TimestampMap, id: string, now = Date.now()) => {
+  const savedAt = meta[id] || 0;
+  return savedAt > 0 && now - savedAt < LOCAL_SAVE_GRACE_MS;
+};
+
 const rememberDeletedPresentation = (id: string, deletedAt = Date.now()) => {
   const deleted = readJsonObject<TimestampMap>(DELETED_PRESENTATIONS_KEY);
   deleted[id] = Math.max(deleted[id] || 0, deletedAt);
@@ -145,6 +165,8 @@ const reconcileWithCloud = (
   pendingSaveIds: Set<string>,
   pendingDeleteIds: Set<string>,
 ): Presentation[] => {
+  const now = Date.now();
+  const localSaveMeta = readJsonObject<TimestampMap>(LOCAL_SAVE_META_KEY);
   const deletedPresentations = pruneDeletedPresentations();
   const cloudById = new Map<string, Presentation>();
 
@@ -165,9 +187,10 @@ const reconcileWithCloud = (
     if (pendingDeleteIds.has(item.id) || deletedPresentations[item.id]) return;
 
     const cloudItem = cloudById.get(item.id);
+    const hasPendingOrRecentSave = pendingSaveIds.has(item.id) || isRecentLocalSave(localSaveMeta, item.id, now);
 
     if (!cloudItem) {
-      if (pendingSaveIds.has(item.id)) {
+      if (hasPendingOrRecentSave) {
         cloudById.set(item.id, item);
       }
       return;
@@ -175,11 +198,14 @@ const reconcileWithCloud = (
 
     const localTime = getPresentationTime(item);
     const cloudTime = getPresentationTime(cloudItem);
-    if (pendingSaveIds.has(item.id) && localTime >= cloudTime) {
+    if (hasPendingOrRecentSave && localTime >= cloudTime) {
       cloudById.set(item.id, item);
       return;
     }
 
+    if (cloudTime >= localTime) {
+      clearLocalSave(item.id);
+    }
   });
 
   return Array.from(cloudById.values())
@@ -398,6 +424,7 @@ export const useStorage = () => {
       }
       return [...prev, touched];
     });
+    markLocalSave(touched.id);
     markSyncStatus(touched.id, 'local');
     return touched;
   }, [markSyncStatus, setAndPersistPresentations]);
@@ -415,6 +442,7 @@ export const useStorage = () => {
       return [...prev, touched];
     });
 
+    markLocalSave(touched.id);
     markSyncStatus(touched.id, 'syncing');
     void submitToGoogleScript(touched, 'save').then(status => markSyncStatus(touched.id, status));
     return touched;
@@ -438,6 +466,7 @@ export const useStorage = () => {
       return [...prev, touched];
     });
 
+    markLocalSave(touched.id);
     markSyncStatus(touched.id, 'syncing');
     void submitToGoogleScript(touched, 'save').then(status => markSyncStatus(touched.id, status));
     return touched;
@@ -452,6 +481,7 @@ export const useStorage = () => {
       return archived;
     }));
     if (archived) {
+      markLocalSave(id);
       markSyncStatus(id, 'syncing');
       void submitToGoogleScript(archived, 'save').then(status => markSyncStatus(id, status));
     }
@@ -468,6 +498,7 @@ export const useStorage = () => {
       return restored;
     }));
     if (restored) {
+      markLocalSave(id);
       markSyncStatus(id, 'syncing');
       void submitToGoogleScript(restored, 'save').then(status => markSyncStatus(id, status));
     }
@@ -512,6 +543,7 @@ export const useStorage = () => {
     });
 
     rememberDeletedPresentation(id, getDeletionTime(deletedPresentation));
+    clearLocalSave(id);
     setAndPersistPresentations(prev => prev.filter(p => p.id !== id));
     markSyncStatus(id, 'syncing');
     void submitToGoogleScript(deletedPresentation, 'save').then(status => markSyncStatus(id, status));
@@ -598,6 +630,7 @@ export const useStorage = () => {
     }));
 
     if (updatedPresentation) {
+      markLocalSave(id);
       markSyncStatus(id, 'syncing');
       void submitToGoogleScript(updatedPresentation, 'save').then(status => markSyncStatus(id, status));
     }
@@ -612,6 +645,7 @@ export const useStorage = () => {
     }));
 
     if (updatedPresentation) {
+      markLocalSave(id);
       markSyncStatus(id, 'syncing');
       void submitToGoogleScript(updatedPresentation, 'save').then(status => markSyncStatus(id, status));
     }
