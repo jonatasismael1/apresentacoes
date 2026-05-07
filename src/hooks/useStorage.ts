@@ -16,7 +16,7 @@ const CLIENT_PROFILES_KEY = 'dbe_client_profiles';
 const EXAMPLE_FLAG = 'dbe_is_example';
 const LOCAL_SAVE_META_KEY = 'dbe_local_save_meta';
 const DELETED_PRESENTATIONS_KEY = 'dbe_deleted_presentations';
-const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbzTt15VdiCcqn9kYwQkl4oc2jQ5UL8uYJZ1k2ToMNRby4F-TJ7C7zLYKVc4HA2hI2YG/exec';
+const CLOUD_API_URL = '/api/presentations';
 const MAX_HISTORY_ENTRIES = 20;
 const LOCAL_SAVE_GRACE_MS = 10 * 60 * 1000;
 const DELETE_TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -217,42 +217,6 @@ const persistPresentations = (presentations: Presentation[]) => {
   localStorage.removeItem(EXAMPLE_FLAG);
 };
 
-const fetchJsonp = <T,>(url: string): Promise<T> => {
-  return new Promise((resolve, reject) => {
-    const callbackName = `jsonp_callback_${Date.now()}_${Math.round(Math.random() * 100000)}`;
-    const callbacks = window as unknown as Window & Record<string, ((data: T) => void) | undefined>;
-    const script = document.createElement('script');
-    const separator = url.includes('?') ? '&' : '?';
-    script.src = `${url}${separator}callback=${callbackName}&_=${Date.now()}`;
-    script.async = true;
-    script.crossOrigin = 'anonymous';
-
-    const cleanup = () => {
-      delete callbacks[callbackName];
-      script.parentNode?.removeChild(script);
-    };
-
-    const timeout = setTimeout(() => {
-      cleanup();
-      reject(new Error('Tempo de resposta esgotado. Verifique sua conexão e tente novamente.'));
-    }, 15000);
-
-    callbacks[callbackName] = (data: T) => {
-      clearTimeout(timeout);
-      cleanup();
-      resolve(data);
-    };
-
-    script.onerror = () => {
-      clearTimeout(timeout);
-      cleanup();
-      reject(new Error('Não foi possível conectar à nuvem. O app funcionará offline.'));
-    };
-
-    document.body.appendChild(script);
-  });
-};
-
 export const useStorage = () => {
   const [presentations, setPresentations] = useState<Presentation[]>(() => {
     const isExample = localStorage.getItem(EXAMPLE_FLAG) === '1';
@@ -289,20 +253,23 @@ export const useStorage = () => {
     setSyncStatusById(prev => ({ ...prev, [id]: status }));
   }, []);
 
-  const submitToGoogleScript = useCallback(async (payload: unknown, type: 'save' | 'delete' = 'save') => {
+  const submitToCloud = useCallback(async (payload: unknown, type: 'save' | 'delete' = 'save') => {
     if (!navigator.onLine) {
       await addToQueue(type, payload);
       return 'pending' as const;
     }
 
     try {
-      const formData = new FormData();
-      formData.append('payload', JSON.stringify(payload));
-      await fetch(CLOUD_API_URL, {
+      const response = await fetch(CLOUD_API_URL, {
         method: 'POST',
-        mode: 'no-cors',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
       });
+      if (!response.ok) {
+        throw new Error(`Falha ao salvar na nuvem (${response.status})`);
+      }
       return 'synced' as const;
     } catch (error) {
       console.error('[Cloud Sync] Erro no envio, adicionando à fila:', error);
@@ -317,13 +284,16 @@ export const useStorage = () => {
     const queue = await getQueue();
     for (const item of queue) {
       try {
-        const formData = new FormData();
-        formData.append('payload', JSON.stringify(item.payload));
-        await fetch(CLOUD_API_URL, {
+        const response = await fetch(CLOUD_API_URL, {
           method: 'POST',
-          mode: 'no-cors',
-          body: formData,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(item.payload),
         });
+        if (!response.ok) {
+          throw new Error(`Falha ao processar fila (${response.status})`);
+        }
         await removeFromQueue(item.id);
       } catch (error) {
         console.error(`[Sync Queue] Falha ao enviar item ${item.id}.`, error);
@@ -336,7 +306,18 @@ export const useStorage = () => {
     if (isManual) setSyncError(null);
 
     try {
-      const cloudData = await fetchJsonp<CloudResponse>(CLOUD_API_URL);
+      const response = await fetch(CLOUD_API_URL, {
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Falha ao carregar a nuvem (${response.status})`);
+      }
+
+      const cloudData = await response.json() as CloudResponse;
 
       if (Array.isArray(cloudData)) {
         const queue = await getQueue();
@@ -444,9 +425,9 @@ export const useStorage = () => {
 
     markLocalSave(touched.id);
     markSyncStatus(touched.id, 'syncing');
-    void submitToGoogleScript(touched, 'save').then(status => markSyncStatus(touched.id, status));
+    void submitToCloud(touched, 'save').then(status => markSyncStatus(touched.id, status));
     return touched;
-  }, [markSyncStatus, setAndPersistPresentations, submitToGoogleScript]);
+  }, [markSyncStatus, setAndPersistPresentations, submitToCloud]);
 
   const savePresentation = useCallback((presentation: Presentation, label = 'Salvar manual') => {
     const current = normalizePresentation(presentation);
@@ -468,9 +449,9 @@ export const useStorage = () => {
 
     markLocalSave(touched.id);
     markSyncStatus(touched.id, 'syncing');
-    void submitToGoogleScript(touched, 'save').then(status => markSyncStatus(touched.id, status));
+    void submitToCloud(touched, 'save').then(status => markSyncStatus(touched.id, status));
     return touched;
-  }, [markSyncStatus, setAndPersistPresentations, submitToGoogleScript]);
+  }, [markSyncStatus, setAndPersistPresentations, submitToCloud]);
 
   const archivePresentation = useCallback((id: string) => {
     const archivedAt = new Date().toISOString();
@@ -483,9 +464,9 @@ export const useStorage = () => {
     if (archived) {
       markLocalSave(id);
       markSyncStatus(id, 'syncing');
-      void submitToGoogleScript(archived, 'save').then(status => markSyncStatus(id, status));
+      void submitToCloud(archived, 'save').then(status => markSyncStatus(id, status));
     }
-  }, [markSyncStatus, setAndPersistPresentations, submitToGoogleScript]);
+  }, [markSyncStatus, setAndPersistPresentations, submitToCloud]);
 
   const restorePresentation = useCallback((id: string) => {
     let restored: Presentation | undefined;
@@ -500,9 +481,9 @@ export const useStorage = () => {
     if (restored) {
       markLocalSave(id);
       markSyncStatus(id, 'syncing');
-      void submitToGoogleScript(restored, 'save').then(status => markSyncStatus(id, status));
+      void submitToCloud(restored, 'save').then(status => markSyncStatus(id, status));
     }
-  }, [markSyncStatus, setAndPersistPresentations, submitToGoogleScript]);
+  }, [markSyncStatus, setAndPersistPresentations, submitToCloud]);
 
   const deletePresentation = useCallback((id: string) => {
     const deletedAt = new Date().toISOString();
@@ -546,8 +527,8 @@ export const useStorage = () => {
     clearLocalSave(id);
     setAndPersistPresentations(prev => prev.filter(p => p.id !== id));
     markSyncStatus(id, 'syncing');
-    void submitToGoogleScript(deletedPresentation, 'save').then(status => markSyncStatus(id, status));
-  }, [markSyncStatus, presentations, setAndPersistPresentations, submitToGoogleScript]);
+    void submitToCloud(deletedPresentation, 'save').then(status => markSyncStatus(id, status));
+  }, [markSyncStatus, presentations, setAndPersistPresentations, submitToCloud]);
 
   const duplicatePresentation = useCallback((id: string, sameClientOnly = false) => {
     const original = presentations.find(p => p.id === id);
@@ -632,9 +613,9 @@ export const useStorage = () => {
     if (updatedPresentation) {
       markLocalSave(id);
       markSyncStatus(id, 'syncing');
-      void submitToGoogleScript(updatedPresentation, 'save').then(status => markSyncStatus(id, status));
+      void submitToCloud(updatedPresentation, 'save').then(status => markSyncStatus(id, status));
     }
-  }, [markSyncStatus, setAndPersistPresentations, submitToGoogleScript]);
+  }, [markSyncStatus, setAndPersistPresentations, submitToCloud]);
 
   const updateApprovalStatus = useCallback((id: string, approvalStatus: ApprovalStatus) => {
     let updatedPresentation: Presentation | undefined;
@@ -647,9 +628,9 @@ export const useStorage = () => {
     if (updatedPresentation) {
       markLocalSave(id);
       markSyncStatus(id, 'syncing');
-      void submitToGoogleScript(updatedPresentation, 'save').then(status => markSyncStatus(id, status));
+      void submitToCloud(updatedPresentation, 'save').then(status => markSyncStatus(id, status));
     }
-  }, [markSyncStatus, setAndPersistPresentations, submitToGoogleScript]);
+  }, [markSyncStatus, setAndPersistPresentations, submitToCloud]);
 
   return {
     presentations,
