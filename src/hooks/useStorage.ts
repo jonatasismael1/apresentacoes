@@ -14,11 +14,16 @@ import { normalizeApprovalStatus, type LegacyApprovalStatus } from '../constants
 const STORAGE_KEY = 'dbe_apresentacoes';
 const CLIENT_PROFILES_KEY = 'dbe_client_profiles';
 const EXAMPLE_FLAG = 'dbe_is_example';
+const LOCAL_CHANGE_META_KEY = 'dbe_local_change_meta';
+const DELETED_PRESENTATIONS_KEY = 'dbe_deleted_presentations';
 const CLOUD_API_URL = 'https://script.google.com/macros/s/AKfycbzTt15VdiCcqn9kYwQkl4oc2jQ5UL8uYJZ1k2ToMNRby4F-TJ7C7zLYKVc4HA2hI2YG/exec';
 const MAX_HISTORY_ENTRIES = 20;
+const LOCAL_CHANGE_GRACE_MS = 10 * 60 * 1000;
+const DELETE_TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 type CloudResponse = Presentation[] | { status: string; message?: string };
 type SyncStatusMap = Record<string, SyncStatus>;
+type TimestampMap = Record<string, number>;
 
 const readJsonArray = <T,>(key: string): T[] => {
   try {
@@ -27,6 +32,19 @@ const readJsonArray = <T,>(key: string): T[] => {
   } catch {
     return [];
   }
+};
+
+const readJsonObject = <T extends Record<string, unknown>>(key: string): T => {
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) as T : {} as T;
+  } catch {
+    return {} as T;
+  }
+};
+
+const writeJsonObject = (key: string, value: Record<string, unknown>) => {
+  localStorage.setItem(key, JSON.stringify(value));
 };
 
 const isCloudError = (data: CloudResponse): data is { status: string; message?: string } => {
@@ -76,22 +94,96 @@ const touchPresentation = (presentation: Presentation): Presentation => ({
   updatedAt: new Date().toISOString(),
 });
 
-const mergeByUpdatedAt = (local: Presentation[], cloud: Presentation[]): Presentation[] => {
-  const byId = new Map<string, Presentation>();
+const getPresentationTime = (presentation: Presentation) => (
+  new Date(presentation.updatedAt || presentation.createdAt).getTime()
+);
 
-  [...local.map(normalizePresentation), ...cloud.map(normalizePresentation)].forEach(item => {
-    const existing = byId.get(item.id);
-    if (!existing) {
-      byId.set(item.id, item);
+const getPayloadId = (payload: unknown): string | undefined => {
+  if (!payload || typeof payload !== 'object') return undefined;
+  const maybePayload = payload as { id?: unknown };
+  return typeof maybePayload.id === 'string' ? maybePayload.id : undefined;
+};
+
+const markLocalChange = (id: string) => {
+  const meta = readJsonObject<TimestampMap>(LOCAL_CHANGE_META_KEY);
+  meta[id] = Date.now();
+  writeJsonObject(LOCAL_CHANGE_META_KEY, meta);
+};
+
+const clearLocalChange = (id: string) => {
+  const meta = readJsonObject<TimestampMap>(LOCAL_CHANGE_META_KEY);
+  if (!(id in meta)) return;
+  delete meta[id];
+  writeJsonObject(LOCAL_CHANGE_META_KEY, meta);
+};
+
+const rememberDeletedPresentation = (id: string) => {
+  const deleted = readJsonObject<TimestampMap>(DELETED_PRESENTATIONS_KEY);
+  deleted[id] = Date.now();
+  writeJsonObject(DELETED_PRESENTATIONS_KEY, deleted);
+};
+
+const pruneDeletedPresentations = () => {
+  const now = Date.now();
+  const deleted = readJsonObject<TimestampMap>(DELETED_PRESENTATIONS_KEY);
+  let changed = false;
+
+  Object.entries(deleted).forEach(([id, timestamp]) => {
+    if (now - timestamp > DELETE_TOMBSTONE_TTL_MS) {
+      delete deleted[id];
+      changed = true;
+    }
+  });
+
+  if (changed) writeJsonObject(DELETED_PRESENTATIONS_KEY, deleted);
+  return deleted;
+};
+
+const reconcileWithCloud = (
+  local: Presentation[],
+  cloud: Presentation[],
+  pendingSaveIds: Set<string>,
+  pendingDeleteIds: Set<string>,
+): Presentation[] => {
+  const now = Date.now();
+  const localChangeMeta = readJsonObject<TimestampMap>(LOCAL_CHANGE_META_KEY);
+  const deletedPresentations = pruneDeletedPresentations();
+  const cloudById = new Map<string, Presentation>();
+
+  cloud.map(normalizePresentation).forEach(item => {
+    const deletedAt = deletedPresentations[item.id];
+    if (deletedAt && deletedAt >= getPresentationTime(item)) return;
+    cloudById.set(item.id, item);
+  });
+
+  local.map(normalizePresentation).forEach(item => {
+    if (pendingDeleteIds.has(item.id) || deletedPresentations[item.id]) return;
+
+    const cloudItem = cloudById.get(item.id);
+    const localChangedAt = localChangeMeta[item.id] || 0;
+    const hasRecentLocalChange = now - localChangedAt < LOCAL_CHANGE_GRACE_MS;
+
+    if (!cloudItem) {
+      if (pendingSaveIds.has(item.id) || hasRecentLocalChange) {
+        cloudById.set(item.id, item);
+      }
       return;
     }
 
-    const existingTime = new Date(existing.updatedAt || existing.createdAt).getTime();
-    const itemTime = new Date(item.updatedAt || item.createdAt).getTime();
-    byId.set(item.id, itemTime >= existingTime ? item : existing);
+    const localTime = getPresentationTime(item);
+    const cloudTime = getPresentationTime(cloudItem);
+    if (pendingSaveIds.has(item.id) || (hasRecentLocalChange && localTime >= cloudTime)) {
+      cloudById.set(item.id, item);
+      return;
+    }
+
+    if (cloudTime >= localTime) {
+      clearLocalChange(item.id);
+    }
   });
 
-  return Array.from(byId.values());
+  return Array.from(cloudById.values())
+    .sort((a, b) => getPresentationTime(b) - getPresentationTime(a));
 };
 
 const persistPresentations = (presentations: Presentation[]) => {
@@ -217,7 +309,18 @@ export const useStorage = () => {
       const cloudData = await fetchJsonp<CloudResponse>(CLOUD_API_URL);
 
       if (Array.isArray(cloudData)) {
-        setAndPersistPresentations(prev => mergeByUpdatedAt(prev, cloudData));
+        const queue = await getQueue();
+        const pendingSaveIds = new Set<string>();
+        const pendingDeleteIds = new Set<string>();
+
+        queue.forEach(item => {
+          const id = getPayloadId(item.payload);
+          if (!id) return;
+          if (item.type === 'delete') pendingDeleteIds.add(id);
+          else pendingSaveIds.add(id);
+        });
+
+        setAndPersistPresentations(prev => reconcileWithCloud(prev, cloudData, pendingSaveIds, pendingDeleteIds));
         setSyncError(null);
         return;
       }
@@ -237,17 +340,44 @@ export const useStorage = () => {
   useEffect(() => {
     const handleOnline = () => {
       processQueue();
+      void fetchFromCloud();
+    };
+    const handleFocus = () => {
+      void fetchFromCloud();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchFromCloud();
+      }
+    };
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === STORAGE_KEY) {
+        setPresentations(readJsonArray<Presentation>(STORAGE_KEY).map(normalizePresentation));
+      }
+      if (event.key === CLIENT_PROFILES_KEY) {
+        setClientProfiles(readJsonArray<ClientProfile>(CLIENT_PROFILES_KEY));
+      }
     };
 
     window.addEventListener('online', handleOnline);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleStorage);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     processQueue();
     const initialFetch = window.setTimeout(() => {
       void fetchFromCloud();
     }, 0);
+    const refreshInterval = window.setInterval(() => {
+      void fetchFromCloud();
+    }, 30000);
 
     return () => {
       window.clearTimeout(initialFetch);
+      window.clearInterval(refreshInterval);
       window.removeEventListener('online', handleOnline);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleStorage);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [fetchFromCloud, processQueue]);
 
@@ -262,9 +392,29 @@ export const useStorage = () => {
       }
       return [...prev, touched];
     });
+    markLocalChange(touched.id);
     markSyncStatus(touched.id, 'local');
     return touched;
   }, [markSyncStatus, setAndPersistPresentations]);
+
+  const savePresentationDraft = useCallback((presentation: Presentation) => {
+    const touched = touchPresentation(presentation);
+
+    setAndPersistPresentations(prev => {
+      const index = prev.findIndex(p => p.id === touched.id);
+      if (index >= 0) {
+        const updated = [...prev];
+        updated[index] = touched;
+        return updated;
+      }
+      return [...prev, touched];
+    });
+
+    markLocalChange(touched.id);
+    markSyncStatus(touched.id, 'syncing');
+    void submitToGoogleScript(touched, 'save').then(status => markSyncStatus(touched.id, status));
+    return touched;
+  }, [markSyncStatus, setAndPersistPresentations, submitToGoogleScript]);
 
   const savePresentation = useCallback((presentation: Presentation, label = 'Salvar manual') => {
     const current = normalizePresentation(presentation);
@@ -284,6 +434,7 @@ export const useStorage = () => {
       return [...prev, touched];
     });
 
+    markLocalChange(touched.id);
     markSyncStatus(touched.id, 'syncing');
     void submitToGoogleScript(touched, 'save').then(status => markSyncStatus(touched.id, status));
     return touched;
@@ -298,6 +449,7 @@ export const useStorage = () => {
       return archived;
     }));
     if (archived) {
+      markLocalChange(id);
       markSyncStatus(id, 'syncing');
       void submitToGoogleScript(archived, 'save').then(status => markSyncStatus(id, status));
     }
@@ -313,12 +465,15 @@ export const useStorage = () => {
       return restored;
     }));
     if (restored) {
+      markLocalChange(id);
       markSyncStatus(id, 'syncing');
       void submitToGoogleScript(restored, 'save').then(status => markSyncStatus(id, status));
     }
   }, [markSyncStatus, setAndPersistPresentations, submitToGoogleScript]);
 
   const deletePresentation = useCallback((id: string) => {
+    rememberDeletedPresentation(id);
+    clearLocalChange(id);
     setAndPersistPresentations(prev => prev.filter(p => p.id !== id));
     markSyncStatus(id, 'syncing');
     void submitToGoogleScript({ action: 'delete', id }, 'delete').then(status => markSyncStatus(id, status));
@@ -405,6 +560,7 @@ export const useStorage = () => {
     }));
 
     if (updatedPresentation) {
+      markLocalChange(id);
       markSyncStatus(id, 'syncing');
       void submitToGoogleScript(updatedPresentation, 'save').then(status => markSyncStatus(id, status));
     }
@@ -419,6 +575,7 @@ export const useStorage = () => {
     }));
 
     if (updatedPresentation) {
+      markLocalChange(id);
       markSyncStatus(id, 'syncing');
       void submitToGoogleScript(updatedPresentation, 'save').then(status => markSyncStatus(id, status));
     }
@@ -432,6 +589,7 @@ export const useStorage = () => {
     syncError,
     savePresentation,
     savePresentationLocal,
+    savePresentationDraft,
     archivePresentation,
     restorePresentation,
     deletePresentation,

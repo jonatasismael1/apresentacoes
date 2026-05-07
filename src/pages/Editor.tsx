@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStorage } from '../hooks/useStorage';
 import { useToast } from '../components/toastContext';
@@ -26,11 +26,15 @@ const Editor: React.FC = () => {
     clientProfiles,
     getPresentation,
     savePresentation,
-    savePresentationLocal,
+    savePresentationDraft,
     createClientProfileFromPresentation,
   } = useStorage();
   const { showToast } = useToast();
   const hasLoaded = useRef(false);
+  const autoSaveTimerRef = useRef<number | null>(null);
+  const saveStateTimerRef = useRef<number | null>(null);
+  const lastSavedFingerprintRef = useRef('');
+  const latestFormDataRef = useRef<Presentation | null>(null);
 
   const [isLoading, setIsLoading] = useState(!!id);
   const [formData, setFormData] = useState<Presentation>({
@@ -51,7 +55,7 @@ const Editor: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState<'dados' | 'roteiros'>('dados');
-  const [showPreview, setShowPreview] = useState(true);
+  const [showPreview, setShowPreview] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
   const [showBulkImport, setShowBulkImport] = useState(false);
 
   const [saveState, setSaveState] = useState<'idle' | 'local' | 'syncing' | 'synced'>('idle');
@@ -65,6 +69,7 @@ const Editor: React.FC = () => {
       if (existing) {
         const loadTimer = window.setTimeout(() => {
           setFormData(existing);
+          lastSavedFingerprintRef.current = getDraftFingerprint(existing);
           hasLoaded.current = true;
           setIsLoading(false);
         }, 0);
@@ -83,19 +88,6 @@ const Editor: React.FC = () => {
     }
   }, [id, getPresentation, presentations.length]);
 
-  // Auto-save debounce effect
-  useEffect(() => {
-    if (!hasLoaded.current || isLoading) return; // Only auto-save after initial load
-
-    const timer = setTimeout(() => {
-      setSaveState('local');
-      savePresentationLocal(formData);
-      setTimeout(() => setSaveState('synced'), 800);
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, [formData, savePresentationLocal, isLoading]);
-
   const validation = {
     clientName: !formData.clientName.trim(),
     title: !formData.title.trim(),
@@ -107,6 +99,65 @@ const Editor: React.FC = () => {
     formData.scripts.length === 0 ? 'roteiros' : '',
   ].filter(Boolean);
   const completedItems = 4 - missingFields.length;
+
+  useEffect(() => {
+    latestFormDataRef.current = formData;
+  }, [formData]);
+
+  const persistDraft = useCallback((data: Presentation) => {
+    if (!hasLoaded.current || isLoading || !hasMeaningfulContent(data)) return;
+
+    const fingerprint = getDraftFingerprint(data);
+    if (fingerprint === lastSavedFingerprintRef.current) return;
+
+    savePresentationDraft(data);
+    lastSavedFingerprintRef.current = fingerprint;
+    setSaveState('syncing');
+
+    if (saveStateTimerRef.current) {
+      window.clearTimeout(saveStateTimerRef.current);
+    }
+    saveStateTimerRef.current = window.setTimeout(() => setSaveState('synced'), 900);
+  }, [isLoading, savePresentationDraft]);
+
+  useEffect(() => {
+    if (!hasLoaded.current || isLoading || !hasMeaningfulContent(formData)) return;
+
+    setSaveState('local');
+    if (autoSaveTimerRef.current) {
+      window.clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      persistDraft(formData);
+    }, 1200);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        window.clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [formData, isLoading, persistDraft]);
+
+  useEffect(() => {
+    const flushDraft = () => {
+      if (autoSaveTimerRef.current) {
+        window.clearTimeout(autoSaveTimerRef.current);
+      }
+      if (latestFormDataRef.current) {
+        persistDraft(latestFormDataRef.current);
+      }
+    };
+
+    window.addEventListener('pagehide', flushDraft);
+    return () => {
+      flushDraft();
+      window.removeEventListener('pagehide', flushDraft);
+      if (saveStateTimerRef.current) {
+        window.clearTimeout(saveStateTimerRef.current);
+      }
+    };
+  }, [persistDraft]);
 
   if (isLoading) {
     return (
@@ -141,10 +192,16 @@ const Editor: React.FC = () => {
     }
     setSaveState('syncing');
     const saved = savePresentation(formData);
+    lastSavedFingerprintRef.current = getDraftFingerprint(saved);
     setFormData(saved);
     setTimeout(() => setSaveState('synced'), 1000);
     showToast('Salvo localmente. Sincronização enviada!', 'success');
     if (!id) navigate(`/editar/${formData.id}`);
+  };
+
+  const handleExit = () => {
+    persistDraft(formData);
+    navigate('/');
   };
 
   const addScript = () => {
@@ -260,7 +317,7 @@ const Editor: React.FC = () => {
       {/* Header */}
       <header className="min-h-16 border-b border-zinc-800 flex flex-wrap items-center justify-between gap-2 px-3 py-2 md:px-6 bg-dbe-dark shrink-0">
         <div className="flex min-w-0 items-center gap-2 md:gap-4">
-          <button onClick={() => navigate('/')} className="btn-ghost px-2 md:px-4">
+          <button onClick={handleExit} className="btn-ghost px-2 md:px-4" title="Voltar">
             <ArrowLeft size={20} />
           </button>
           <h1 className="font-bold hidden md:block">
@@ -297,6 +354,14 @@ const Editor: React.FC = () => {
           >
             <Eye size={18} />
             Preview
+          </button>
+          <button
+            onClick={() => setShowPreview(prev => !prev)}
+            className={`btn-secondary px-3 lg:hidden ${showPreview ? 'bg-dbe-blue/20 text-dbe-blue' : ''}`}
+            title={showPreview ? 'Editar roteiros' : 'Ver preview'}
+          >
+            {showPreview ? <Settings size={18} /> : <Eye size={18} />}
+            <span className="hidden sm:inline">{showPreview ? 'Editar' : 'Preview'}</span>
           </button>
           <button onClick={() => navigate(`/visualizar/${formData.id}`)} className="btn-secondary hidden sm:flex" disabled={!id}>
             <Layout size={18} />
@@ -674,9 +739,11 @@ const Editor: React.FC = () => {
           
           <button 
             onClick={() => setShowPreview(false)}
-            className="lg:hidden fixed bottom-6 right-6 w-14 h-14 bg-dbe-blue rounded-full shadow-2xl flex items-center justify-center text-white"
+            className="lg:hidden fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-4 z-30 h-12 min-w-28 px-4 bg-dbe-blue rounded-full shadow-2xl flex items-center justify-center gap-2 text-white font-bold"
+            title="Editar roteiros"
           >
-            <Settings size={24} />
+            <Settings size={20} />
+            <span>Editar</span>
           </button>
         </div>
       </main>
@@ -690,6 +757,39 @@ const Editor: React.FC = () => {
     </div>
   );
 };
+
+function hasMeaningfulContent(data: Presentation) {
+  const hasPresentationFields = [
+    data.clientName,
+    data.clientSegment,
+    data.title,
+    data.objective,
+    data.format,
+    data.responsible,
+    data.clientLogo,
+  ].some(value => Boolean(value?.trim()));
+
+  return hasPresentationFields || data.scripts.some(script => (
+    [
+      script.title,
+      script.theme,
+      script.audience,
+      script.tone,
+      script.hook,
+      script.development,
+      script.cta,
+      script.notes,
+      script.referenceLink,
+    ].some(value => Boolean(value?.trim()))
+  ));
+}
+
+function getDraftFingerprint(data: Presentation) {
+  const { updatedAt: _updatedAt, history: _history, ...draft } = data;
+  void _updatedAt;
+  void _history;
+  return JSON.stringify(draft);
+}
 
 function RefreshDot() {
   return <span className="w-2 h-2 rounded-full bg-dbe-blue animate-pulse" />;
