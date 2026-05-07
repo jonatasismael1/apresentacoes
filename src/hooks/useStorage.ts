@@ -117,9 +117,9 @@ const clearLocalChange = (id: string) => {
   writeJsonObject(LOCAL_CHANGE_META_KEY, meta);
 };
 
-const rememberDeletedPresentation = (id: string) => {
+const rememberDeletedPresentation = (id: string, deletedAt = Date.now()) => {
   const deleted = readJsonObject<TimestampMap>(DELETED_PRESENTATIONS_KEY);
-  deleted[id] = Date.now();
+  deleted[id] = Math.max(deleted[id] || 0, deletedAt);
   writeJsonObject(DELETED_PRESENTATIONS_KEY, deleted);
 };
 
@@ -139,6 +139,12 @@ const pruneDeletedPresentations = () => {
   return deleted;
 };
 
+const getDeletedTime = (presentation: Presentation) => (
+  presentation.deletedAt ? new Date(presentation.deletedAt).getTime() : 0
+);
+
+const isDeletedPresentation = (presentation: Presentation) => Boolean(getDeletedTime(presentation));
+
 const reconcileWithCloud = (
   local: Presentation[],
   cloud: Presentation[],
@@ -151,6 +157,13 @@ const reconcileWithCloud = (
   const cloudById = new Map<string, Presentation>();
 
   cloud.map(normalizePresentation).forEach(item => {
+    const cloudDeleteTime = getDeletedTime(item);
+    if (cloudDeleteTime) {
+      deletedPresentations[item.id] = Math.max(deletedPresentations[item.id] || 0, cloudDeleteTime);
+      rememberDeletedPresentation(item.id, cloudDeleteTime);
+      return;
+    }
+
     const deletedAt = deletedPresentations[item.id];
     if (deletedAt && deletedAt >= getPresentationTime(item)) return;
     cloudById.set(item.id, item);
@@ -230,7 +243,9 @@ const fetchJsonp = <T,>(url: string): Promise<T> => {
 export const useStorage = () => {
   const [presentations, setPresentations] = useState<Presentation[]>(() => {
     const isExample = localStorage.getItem(EXAMPLE_FLAG) === '1';
-    return isExample ? [] : readJsonArray<Presentation>(STORAGE_KEY).map(normalizePresentation);
+    return isExample ? [] : readJsonArray<Presentation>(STORAGE_KEY)
+      .map(normalizePresentation)
+      .filter(item => !isDeletedPresentation(item));
   });
   const [clientProfiles, setClientProfiles] = useState<ClientProfile[]>(() =>
     readJsonArray<ClientProfile>(CLIENT_PROFILES_KEY)
@@ -241,7 +256,9 @@ export const useStorage = () => {
 
   const setAndPersistPresentations = useCallback((updater: (prev: Presentation[]) => Presentation[]) => {
     setPresentations(prev => {
-      const updated = updater(prev).map(normalizePresentation);
+      const updated = updater(prev)
+        .map(normalizePresentation)
+        .filter(item => !isDeletedPresentation(item));
       persistPresentations(updated);
       return updated;
     });
@@ -352,7 +369,9 @@ export const useStorage = () => {
     };
     const handleStorage = (event: StorageEvent) => {
       if (event.key === STORAGE_KEY) {
-        setPresentations(readJsonArray<Presentation>(STORAGE_KEY).map(normalizePresentation));
+        setPresentations(readJsonArray<Presentation>(STORAGE_KEY)
+          .map(normalizePresentation)
+          .filter(item => !isDeletedPresentation(item)));
       }
       if (event.key === CLIENT_PROFILES_KEY) {
         setClientProfiles(readJsonArray<ClientProfile>(CLIENT_PROFILES_KEY));
@@ -459,8 +478,9 @@ export const useStorage = () => {
     let restored: Presentation | undefined;
     setAndPersistPresentations(prev => prev.map(item => {
       if (item.id !== id) return item;
-      const { archivedAt: _archivedAt, ...rest } = item;
+      const { archivedAt: _archivedAt, deletedAt: _deletedAt, ...rest } = item;
       void _archivedAt;
+      void _deletedAt;
       restored = touchPresentation({ ...rest, approvalStatus: normalizeApprovalStatus(rest.approvalStatus) === 'finalized' ? 'sent' : normalizeApprovalStatus(rest.approvalStatus) });
       return restored;
     }));
@@ -472,12 +492,33 @@ export const useStorage = () => {
   }, [markSyncStatus, setAndPersistPresentations, submitToGoogleScript]);
 
   const deletePresentation = useCallback((id: string) => {
-    rememberDeletedPresentation(id);
+    const deletedAt = new Date().toISOString();
+    const existing = presentations.find(item => item.id === id);
+    const deletedPresentation = touchPresentation({
+      ...(existing ? normalizePresentation(existing) : {
+        id,
+        clientName: '',
+        clientSegment: '',
+        title: '',
+        objective: '',
+        format: '',
+        responsible: '',
+        date: '',
+        scripts: [],
+        createdAt: deletedAt,
+        approvalStatus: 'sent' as ApprovalStatus,
+        comments: [],
+        history: [],
+      }),
+      deletedAt,
+    });
+
+    rememberDeletedPresentation(id, getDeletedTime(deletedPresentation));
     clearLocalChange(id);
     setAndPersistPresentations(prev => prev.filter(p => p.id !== id));
     markSyncStatus(id, 'syncing');
-    void submitToGoogleScript({ action: 'delete', id }, 'delete').then(status => markSyncStatus(id, status));
-  }, [markSyncStatus, setAndPersistPresentations, submitToGoogleScript]);
+    void submitToGoogleScript(deletedPresentation, 'save').then(status => markSyncStatus(id, status));
+  }, [markSyncStatus, presentations, setAndPersistPresentations, submitToGoogleScript]);
 
   const duplicatePresentation = useCallback((id: string, sameClientOnly = false) => {
     const original = presentations.find(p => p.id === id);

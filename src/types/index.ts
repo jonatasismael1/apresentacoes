@@ -14,6 +14,7 @@ export interface Presentation {
   createdAt: string;
   updatedAt?: string;
   archivedAt?: string;
+  deletedAt?: string;
   clientProfileId?: string;
   approvalStatus?: ApprovalStatus;
   comments?: ApprovalComment[];
