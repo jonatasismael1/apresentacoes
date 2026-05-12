@@ -14,22 +14,24 @@ import { useEffect, useCallback, useRef } from 'react';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const KEY_MAP = {
-  actionBackward: [
+  scrollUp: [
     'ArrowUp',
-    'ArrowLeft',
     'PageUp',
-    // Fallbacks para Desktop:
     'AudioVolumeUp',
     'VolumeUp',
-    'MediaTrackPrevious'
   ],
-  actionForward: [
+  scrollDown: [
     'ArrowDown',
-    'ArrowRight',
     'PageDown',
-    // Fallbacks para Desktop:
     'AudioVolumeDown',
     'VolumeDown',
+  ],
+  speedDown: [
+    'ArrowLeft',
+    'MediaTrackPrevious'
+  ],
+  speedUp: [
+    'ArrowRight',
     'MediaTrackNext'
   ],
   togglePlayPause: [
@@ -44,14 +46,14 @@ export const KEY_MAP = {
 } as const;
 
 export const KEYCODE_MAP: Record<number, keyof typeof KEY_MAP> = {
-  38: 'actionBackward', // ArrowUp
-  37: 'actionBackward', // ArrowLeft
-  33: 'actionBackward', // PageUp
-  175: 'actionBackward', // VolumeUp
-  40: 'actionForward',  // ArrowDown
-  39: 'actionForward',  // ArrowRight
-  34: 'actionForward',  // PageDown
-  174: 'actionForward', // VolumeDown
+  38: 'scrollUp', // ArrowUp
+  37: 'speedDown', // ArrowLeft
+  33: 'scrollUp', // PageUp
+  175: 'scrollUp', // VolumeUp
+  40: 'scrollDown',  // ArrowDown
+  39: 'speedUp',  // ArrowRight
+  34: 'scrollDown',  // PageDown
+  174: 'scrollDown', // VolumeDown
   13: 'togglePlayPause',// Enter
   32: 'togglePlayPause',// Space
   179: 'togglePlayPause',// MediaPlayPause
@@ -61,8 +63,10 @@ export type TeleprompterAction = keyof typeof KEY_MAP;
 
 export interface UseTeleprompterKeysOptions {
   active: boolean;
-  onActionBackward?: () => void;
-  onActionForward?: () => void;
+  onScrollUp?: () => void;
+  onScrollDown?: () => void;
+  onSpeedDown?: () => void;
+  onSpeedUp?: () => void;
   onTogglePlayPause?: () => void;
   onKeyDebug?: (info: KeyDebugInfo) => void;
   containerRef?: React.RefObject<HTMLElement | null>;
@@ -99,16 +103,20 @@ function resolveActionByKey(key: string): TeleprompterAction | null {
 export function useTeleprompterKeys(options: UseTeleprompterKeysOptions) {
   const {
     active,
-    onActionBackward,
-    onActionForward,
+    onScrollUp,
+    onScrollDown,
+    onSpeedDown,
+    onSpeedUp,
     onTogglePlayPause,
     onKeyDebug,
     containerRef,
   } = options;
 
   const cbRef = useRef({
-    onActionBackward,
-    onActionForward,
+    onScrollUp,
+    onScrollDown,
+    onSpeedDown,
+    onSpeedUp,
     onTogglePlayPause,
     onKeyDebug,
   });
@@ -116,8 +124,8 @@ export function useTeleprompterKeys(options: UseTeleprompterKeysOptions) {
   const activeRef = useRef(active);
 
   useEffect(() => {
-    cbRef.current = { onActionBackward, onActionForward, onTogglePlayPause, onKeyDebug };
-  }, [onActionBackward, onActionForward, onTogglePlayPause, onKeyDebug]);
+    cbRef.current = { onScrollUp, onScrollDown, onSpeedDown, onSpeedUp, onTogglePlayPause, onKeyDebug };
+  }, [onScrollUp, onScrollDown, onSpeedDown, onSpeedUp, onTogglePlayPause, onKeyDebug]);
 
   useEffect(() => {
     activeRef.current = active;
@@ -125,8 +133,10 @@ export function useTeleprompterKeys(options: UseTeleprompterKeysOptions) {
 
   const triggerAction = useCallback((action: TeleprompterAction) => {
     switch (action) {
-      case 'actionBackward':   cbRef.current.onActionBackward?.();   break;
-      case 'actionForward':    cbRef.current.onActionForward?.();    break;
+      case 'scrollUp':         cbRef.current.onScrollUp?.();         break;
+      case 'scrollDown':       cbRef.current.onScrollDown?.();       break;
+      case 'speedDown':        cbRef.current.onSpeedDown?.();        break;
+      case 'speedUp':          cbRef.current.onSpeedUp?.();          break;
       case 'togglePlayPause':  cbRef.current.onTogglePlayPause?.();  break;
     }
   }, []);
@@ -209,8 +219,10 @@ export function useTeleprompterKeys(options: UseTeleprompterKeysOptions) {
             // 12 = UP, 13 = DOWN, 14 = LEFT, 15 = RIGHT
             // 4, 5 = L1, R1
             // 9 = Start
-            if ([12, 14, 4].includes(index)) action = 'actionBackward'; // Up, Left, L1
-            if ([13, 15, 5].includes(index)) action = 'actionForward';  // Down, Right, R1
+            if (index === 12) action = 'scrollUp';
+            if (index === 13) action = 'scrollDown';
+            if ([14, 4].includes(index)) action = 'speedDown'; // Left, L1
+            if ([15, 5].includes(index)) action = 'speedUp';  // Right, R1
             if ([0, 1, 2, 3, 9].includes(index)) action = 'togglePlayPause'; // A,B,X,Y,Start
 
             cbRef.current.onKeyDebug?.({
@@ -241,9 +253,9 @@ export function useTeleprompterKeys(options: UseTeleprompterKeysOptions) {
             let action: TeleprompterAction | null = null;
             // Axis 0 = Esquerda/Direita, Axis 1 = Cima/Baixo
             if (index === 0) {
-              action = direction === 'neg' ? 'actionBackward' : 'actionForward';
+              action = direction === 'neg' ? 'speedDown' : 'speedUp';
             } else if (index === 1) {
-              action = direction === 'neg' ? 'actionBackward' : 'actionForward';
+              action = direction === 'neg' ? 'scrollUp' : 'scrollDown';
             }
 
             if (action) {

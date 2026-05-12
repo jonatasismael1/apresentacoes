@@ -454,36 +454,35 @@ export const useStorage = () => {
   }, [markSyncStatus, setAndPersistPresentations, submitToCloud]);
 
   const archivePresentation = useCallback((id: string) => {
+    const existing = presentations.find(item => item.id === id);
+    if (!existing) return;
+
     const archivedAt = new Date().toISOString();
-    let archived: Presentation | undefined;
-    setAndPersistPresentations(prev => prev.map(item => {
-      if (item.id !== id) return item;
-      archived = { ...touchPresentation(item), archivedAt, approvalStatus: 'finalized' };
-      return archived;
-    }));
-    if (archived) {
-      markLocalSave(id);
-      markSyncStatus(id, 'syncing');
-      void submitToCloud(archived, 'save').then(status => markSyncStatus(id, status));
-    }
-  }, [markSyncStatus, setAndPersistPresentations, submitToCloud]);
+    const archived: Presentation = { ...touchPresentation(existing), archivedAt, approvalStatus: 'finalized' };
+    setAndPersistPresentations(prev => prev.map(item => item.id === id ? archived : item));
+    markLocalSave(id);
+    markSyncStatus(id, 'syncing');
+    void submitToCloud(archived, 'save').then(status => markSyncStatus(id, status));
+  }, [markSyncStatus, presentations, setAndPersistPresentations, submitToCloud]);
 
   const restorePresentation = useCallback((id: string) => {
-    let restored: Presentation | undefined;
-    setAndPersistPresentations(prev => prev.map(item => {
-      if (item.id !== id) return item;
-      const { archivedAt: _archivedAt, deletedAt: _deletedAt, ...rest } = item;
-      void _archivedAt;
-      void _deletedAt;
-      restored = touchPresentation({ ...rest, approvalStatus: normalizeApprovalStatus(rest.approvalStatus) === 'finalized' ? 'sent' : normalizeApprovalStatus(rest.approvalStatus) });
-      return restored;
-    }));
-    if (restored) {
-      markLocalSave(id);
-      markSyncStatus(id, 'syncing');
-      void submitToCloud(restored, 'save').then(status => markSyncStatus(id, status));
-    }
-  }, [markSyncStatus, setAndPersistPresentations, submitToCloud]);
+    const existing = presentations.find(item => item.id === id);
+    if (!existing) return;
+
+    const { archivedAt: _archivedAt, deletedAt: _deletedAt, ...rest } = existing;
+    void _archivedAt;
+    void _deletedAt;
+    const currentStatus = normalizeApprovalStatus(rest.approvalStatus);
+    const restored = touchPresentation({
+      ...rest,
+      approvalStatus: currentStatus === 'finalized' ? 'sent' : currentStatus,
+    });
+
+    setAndPersistPresentations(prev => prev.map(item => item.id === id ? restored : item));
+    markLocalSave(id);
+    markSyncStatus(id, 'syncing');
+    void submitToCloud(restored, 'save').then(status => markSyncStatus(id, status));
+  }, [markSyncStatus, presentations, setAndPersistPresentations, submitToCloud]);
 
   const deletePresentation = useCallback((id: string) => {
     const deletedAt = new Date().toISOString();
@@ -593,44 +592,36 @@ export const useStorage = () => {
   }, [saveClientProfile]);
 
   const addApprovalComment = useCallback((id: string, message: string, author = 'DBE') => {
-    let updatedPresentation: Presentation | undefined;
+    const existing = presentations.find(item => item.id === id);
+    if (!existing) return;
+
     const comment: ApprovalComment = {
       id: uuidv4(),
       author,
       message,
       createdAt: new Date().toISOString(),
     };
+    const updatedPresentation = touchPresentation({
+      ...existing,
+      comments: [comment, ...(existing.comments || [])],
+    });
 
-    setAndPersistPresentations(prev => prev.map(item => {
-      if (item.id !== id) return item;
-      updatedPresentation = touchPresentation({
-        ...item,
-        comments: [comment, ...(item.comments || [])],
-      });
-      return updatedPresentation;
-    }));
-
-    if (updatedPresentation) {
-      markLocalSave(id);
-      markSyncStatus(id, 'syncing');
-      void submitToCloud(updatedPresentation, 'save').then(status => markSyncStatus(id, status));
-    }
-  }, [markSyncStatus, setAndPersistPresentations, submitToCloud]);
+    setAndPersistPresentations(prev => prev.map(item => item.id === id ? updatedPresentation : item));
+    markLocalSave(id);
+    markSyncStatus(id, 'syncing');
+    void submitToCloud(updatedPresentation, 'save').then(status => markSyncStatus(id, status));
+  }, [markSyncStatus, presentations, setAndPersistPresentations, submitToCloud]);
 
   const updateApprovalStatus = useCallback((id: string, approvalStatus: ApprovalStatus) => {
-    let updatedPresentation: Presentation | undefined;
-    setAndPersistPresentations(prev => prev.map(item => {
-      if (item.id !== id) return item;
-      updatedPresentation = touchPresentation(applyStatusToPresentation(item, approvalStatus));
-      return updatedPresentation;
-    }));
+    const existing = presentations.find(item => item.id === id);
+    if (!existing) return;
 
-    if (updatedPresentation) {
-      markLocalSave(id);
-      markSyncStatus(id, 'syncing');
-      void submitToCloud(updatedPresentation, 'save').then(status => markSyncStatus(id, status));
-    }
-  }, [markSyncStatus, setAndPersistPresentations, submitToCloud]);
+    const updatedPresentation = touchPresentation(applyStatusToPresentation(existing, approvalStatus));
+    setAndPersistPresentations(prev => prev.map(item => item.id === id ? updatedPresentation : item));
+    markLocalSave(id);
+    markSyncStatus(id, 'syncing');
+    void submitToCloud(updatedPresentation, 'save').then(status => markSyncStatus(id, status));
+  }, [markSyncStatus, presentations, setAndPersistPresentations, submitToCloud]);
 
   return {
     presentations,

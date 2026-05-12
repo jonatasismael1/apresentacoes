@@ -73,34 +73,21 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
   }, [settings]);
 
   // ─── Handlers para o controle Bluetooth ─────────────────────────────────────
-  // Ação de RECUA (Seta pra cima, Esquerda, Volume +, etc)
-  //   PAUSADO  → sobe o texto (recua)
-  //   PLAYING  → diminui velocidade
+  // Cima/baixo rolam o texto; esquerda/direita ajustam a velocidade.
+  const handleScrollUp = useCallback(() => {
+    setScrollPos(prev => Math.max(0, prev - 150));
+  }, []);
 
-  // ← (ArrowLeft) → comportamento depende do estado:
-  //   PAUSADO  → sobe o texto (recua)
-  //   PLAYING  → diminui velocidade
-  const handleLeft = useCallback(() => {
-    if (isPlayingRef.current) {
-      // Diminui velocidade
-      updateSettings({ speed: Math.max(0.1, settingsRef.current.speed - 0.5) });
-    } else {
-      // Sobe o texto (volta)
-      setScrollPos(prev => Math.max(0, prev - 150));
-    }
+  const handleScrollDown = useCallback(() => {
+    setScrollPos(prev => prev + 150);
+  }, []);
+
+  const handleSpeedDown = useCallback(() => {
+    updateSettings({ speed: Math.max(0.1, settingsRef.current.speed - 0.5) });
   }, [updateSettings]);
 
-  // → (ArrowRight) → comportamento depende do estado:
-  //   PAUSADO  → desce o texto (avança)
-  //   PLAYING  → aumenta velocidade
-  const handleRight = useCallback(() => {
-    if (isPlayingRef.current) {
-      // Aumenta velocidade
-      updateSettings({ speed: Math.min(10, settingsRef.current.speed + 0.5) });
-    } else {
-      // Desce o texto (avança)
-      setScrollPos(prev => prev + 150);
-    }
+  const handleSpeedUp = useCallback(() => {
+    updateSettings({ speed: Math.min(10, settingsRef.current.speed + 0.5) });
   }, [updateSettings]);
 
   // Enter / Space / MediaPlayPause → play/pause
@@ -159,13 +146,13 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
   useEffect(() => () => cancelCountdown(), [cancelCountdown]);
 
   // Integra o hook de teclas — controle Bluetooth em modo HID
-  // NOTA: ↑/↓ físicos do Ulanzi enviam VolumeUp/Down (SO intercepta no mobile).
-  // Por isso mapeamos ←/→ contextualmente: pausado=scroll, rodando=velocidade.
   useTeleprompterKeys({
     active: true,
     containerRef,
-    onActionBackward:  handleLeft,
-    onActionForward:   handleRight,
+    onScrollUp:        handleScrollUp,
+    onScrollDown:      handleScrollDown,
+    onSpeedDown:       handleSpeedDown,
+    onSpeedUp:         handleSpeedUp,
     onTogglePlayPause: handleTogglePlay,
   });
 
@@ -328,9 +315,9 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
               <div className="w-[1px] h-6 sm:h-8 bg-zinc-800 mx-0.5" />
 
               <button 
-                onClick={handleLeft}
+                onClick={handleSpeedDown}
                 className="p-2 sm:p-3 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
-                title="Voltar / Diminuir velocidade (←)"
+                title="Diminuir velocidade (←)"
               >
                 <Minus size={18} />
               </button>
@@ -343,9 +330,9 @@ const TeleprompterReader: React.FC<Props> = ({ text, settings, onExit, updateSet
               </button>
 
               <button 
-                onClick={handleRight}
+                onClick={handleSpeedUp}
                 className="p-2 sm:p-3 hover:bg-zinc-800 rounded-full transition-colors text-zinc-400 hover:text-white"
-                title="Avançar / Aumentar velocidade (→)"
+                title="Aumentar velocidade (→)"
               >
                 <Plus size={18} />
               </button>
